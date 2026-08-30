@@ -26,13 +26,13 @@ func TestSZUMonthlyQuotaAccumulatesAndNeverResets(t *testing.T) {
 
 	grantAt := func(timestamp int64) bool {
 		t.Helper()
-		granted := false
+		creditedQuota := 0
 		require.NoError(t, DB.Transaction(func(tx *gorm.DB) error {
 			var err error
-			granted, err = grantSZUMonthlyQuotaForUserWithTx(tx, user.Id, timestamp)
+			creditedQuota, err = grantSZUMonthlyQuotaForUserWithTx(tx, user.Id, timestamp)
 			return err
 		}))
-		return granted
+		return creditedQuota > 0
 	}
 
 	require.True(t, grantAt(september))
@@ -203,14 +203,15 @@ func TestSZUStartupMigrationIsSafeBeforeRedisInitialization(t *testing.T) {
 
 func TestManagedRoleMappingKeepsAuthorizationAndAccountTypeConsistent(t *testing.T) {
 	tests := []struct {
-		name        string
-		managedRole string
-		role        int
-		accountType string
+		name         string
+		managedRole  string
+		role         int
+		accountType  string
+		monthlyQuota int
 	}{
-		{name: "administrator", managedRole: ManagedRoleAdmin, role: common.RoleAdminUser, accountType: AccountTypeTeacher},
-		{name: "teacher", managedRole: ManagedRoleTeacher, role: common.RoleCommonUser, accountType: AccountTypeTeacher},
-		{name: "student", managedRole: ManagedRoleStudent, role: common.RoleCommonUser, accountType: AccountTypeStudent},
+		{name: "administrator", managedRole: ManagedRoleAdmin, role: common.RoleAdminUser, accountType: AccountTypeTeacher, monthlyQuota: SZUAdminMonthlyQuota},
+		{name: "teacher", managedRole: ManagedRoleTeacher, role: common.RoleCommonUser, accountType: AccountTypeTeacher, monthlyQuota: SZUTeacherMonthlyQuota},
+		{name: "student", managedRole: ManagedRoleStudent, role: common.RoleCommonUser, accountType: AccountTypeStudent, monthlyQuota: SZUStudentMonthlyQuota},
 	}
 
 	for _, test := range tests {
@@ -220,8 +221,52 @@ func TestManagedRoleMappingKeepsAuthorizationAndAccountTypeConsistent(t *testing
 			assert.Equal(t, test.role, user.Role)
 			assert.Equal(t, test.accountType, user.AccountType)
 			assert.Equal(t, test.managedRole, ManagedRoleForUser(&user))
+			assert.Equal(t, test.monthlyQuota, SZUMonthlyQuotaForUser(&user))
 		})
 	}
+}
+
+func TestSZUMonthlyQuotaPromotionsTopUpCurrentMonthWithoutClawback(t *testing.T) {
+	truncateTables(t)
+	user := User{
+		Username:    "role-quota-user",
+		Password:    "password",
+		AffCode:     "role-quota-aff",
+		Status:      common.UserStatusEnabled,
+		Role:        common.RoleCommonUser,
+		AccountType: AccountTypeStudent,
+	}
+	require.NoError(t, DB.Create(&user).Error)
+	grantAt := time.Date(2026, time.September, 1, 0, 0, 0, 0, szuQuotaLocation).Unix()
+
+	credit := func() int {
+		t.Helper()
+		creditedQuota := 0
+		require.NoError(t, DB.Transaction(func(tx *gorm.DB) error {
+			var err error
+			creditedQuota, err = grantSZUMonthlyQuotaForUserWithTx(tx, user.Id, grantAt)
+			return err
+		}))
+		return creditedQuota
+	}
+
+	assert.Equal(t, SZUStudentMonthlyQuota, credit())
+	require.NoError(t, ApplyManagedRole(&user, ManagedRoleTeacher))
+	require.NoError(t, DB.Model(&user).Select("role", "account_type").Updates(&user).Error)
+	assert.Equal(t, SZUTeacherMonthlyQuota-SZUStudentMonthlyQuota, credit())
+	require.NoError(t, ApplyManagedRole(&user, ManagedRoleAdmin))
+	require.NoError(t, DB.Model(&user).Select("role", "account_type").Updates(&user).Error)
+	assert.Equal(t, SZUAdminMonthlyQuota-SZUTeacherMonthlyQuota, credit())
+
+	require.NoError(t, ApplyManagedRole(&user, ManagedRoleStudent))
+	require.NoError(t, DB.Model(&user).Select("role", "account_type").Updates(&user).Error)
+	assert.Zero(t, credit())
+	require.NoError(t, DB.First(&user, user.Id).Error)
+	assert.Equal(t, SZUAdminMonthlyQuota, user.Quota)
+
+	var grant SZUMonthlyQuotaGrant
+	require.NoError(t, DB.Where("user_id = ? AND grant_month = ?", user.Id, "2026-09").First(&grant).Error)
+	assert.Equal(t, SZUAdminMonthlyQuota, grant.Amount)
 }
 
 func TestManagedUserIdentityMirrorsEmailAndCompatibilityDisplayName(t *testing.T) {

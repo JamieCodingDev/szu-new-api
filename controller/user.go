@@ -775,13 +775,16 @@ func UpdateUser(c *gin.Context) {
 	}
 	updatePassword := updatedUser.Password != ""
 	authzTouched := false
+	monthlyQuotaCredit := 0
 	if err := model.DB.Transaction(func(tx *gorm.DB) error {
 		if err := updatedUser.EditWithTx(tx, updatePassword); err != nil {
 			return err
 		}
-		if err := model.SyncSZUEducationSubscriptionForUserWithTx(tx, &updatedUser); err != nil {
+		creditedQuota, err := model.SyncSZUEducationSubscriptionForUserWithTx(tx, &updatedUser)
+		if err != nil {
 			return err
 		}
+		monthlyQuotaCredit = creditedQuota
 		touched, err := updateAdminPermissionsForUserInTx(c, tx, updatedUser.Id, updatedUser.Role, updatedUser.AdminPermissions)
 		authzTouched = touched
 		return err
@@ -789,6 +792,7 @@ func UpdateUser(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	model.SyncSZUMonthlyQuotaCreditCache(updatedUser.Id, monthlyQuotaCredit)
 	if authzTouched {
 		if err := authz.ReloadPolicy(); err != nil {
 			common.ApiError(c, err)
@@ -1120,7 +1124,7 @@ func CreateUser(c *gin.Context) {
 		if err := cleanUser.InsertWithTx(tx, 0); err != nil {
 			return err
 		}
-		if err := model.SyncSZUEducationSubscriptionForUserWithTx(tx, &cleanUser); err != nil {
+		if _, err := model.SyncSZUEducationSubscriptionForUserWithTx(tx, &cleanUser); err != nil {
 			return err
 		}
 		touched, err := updateAdminPermissionsForUserInTx(c, tx, cleanUser.Id, cleanUser.Role, user.AdminPermissions)
@@ -1320,7 +1324,7 @@ func ManageUser(c *gin.Context) {
 			if err := user.UpdateWithTx(tx, false); err != nil {
 				return err
 			}
-			if err := model.SyncSZUEducationSubscriptionForUserWithTx(tx, &user); err != nil {
+			if _, err := model.SyncSZUEducationSubscriptionForUserWithTx(tx, &user); err != nil {
 				return err
 			}
 			return authz.ClearUserAuthorizationInTx(tx, user.Id)

@@ -20,15 +20,15 @@ const (
 	ManagedRoleTeacher = "teacher"
 	ManagedRoleStudent = "student"
 
-	// Every enabled account receives the same monthly free grant. The grant is
-	// credited to the ordinary user wallet, so unused quota automatically rolls
-	// over and redemption credits are available through the same balance.
-	SZUMonthlyFreeQuota = 100_000
+	// Monthly grants are credited to the ordinary user wallet. Unused quota
+	// automatically rolls over and redemption credits use the same balance.
+	SZUStudentMonthlyQuota = 100_000
+	SZUTeacherMonthlyQuota = 200_000
+	SZUAdminMonthlyQuota   = 1_000_000
 
-	// Kept as aliases for callers that display the account type. Account type no
-	// longer changes quota or creates a subscription.
-	SZUStudentMonthlyQuota = SZUMonthlyFreeQuota
-	SZUTeacherMonthlyQuota = SZUMonthlyFreeQuota
+	// Kept for compatibility with callers that use the old student-default
+	// constant. New code should use SZUMonthlyQuotaForUser.
+	SZUMonthlyFreeQuota = SZUStudentMonthlyQuota
 
 	szuAutomaticSubscriptionSource = "szu_auto"
 )
@@ -85,6 +85,18 @@ func ManagedRoleForUser(user *User) string {
 		return ManagedRoleTeacher
 	}
 	return ManagedRoleStudent
+}
+
+// SZUMonthlyQuotaForUser returns the role-specific monthly free grant.
+func SZUMonthlyQuotaForUser(user *User) int {
+	switch ManagedRoleForUser(user) {
+	case ManagedRoleAdmin:
+		return SZUAdminMonthlyQuota
+	case ManagedRoleTeacher:
+		return SZUTeacherMonthlyQuota
+	default:
+		return SZUStudentMonthlyQuota
+	}
 }
 
 // ApplyManagedRole keeps the legacy role/account_type columns synchronized.
@@ -144,21 +156,28 @@ func szuGrantMonth(timestamp int64) string {
 	return time.Unix(timestamp, 0).In(szuQuotaLocation).Format("2006-01")
 }
 
-// grantSZUMonthlyQuotaForUserWithTx credits exactly one monthly grant. It must
-// run inside a transaction so the ledger row and wallet increment commit or
-// roll back together.
-func grantSZUMonthlyQuotaForUserWithTx(tx *gorm.DB, userId int, timestamp int64) (bool, error) {
+// grantSZUMonthlyQuotaForUserWithTx credits one role-specific monthly grant. If
+// an older grant for the same month is lower than the user's current role, only
+// the difference is added. Downgrades never remove quota that was already
+// granted. It must run inside a transaction so the ledger row and wallet update
+// commit or roll back together.
+func grantSZUMonthlyQuotaForUserWithTx(tx *gorm.DB, userId int, timestamp int64) (int, error) {
 	if tx == nil || userId <= 0 {
-		return false, errors.New("invalid monthly quota grant arguments")
+		return 0, errors.New("invalid monthly quota grant arguments")
 	}
 	if timestamp <= 0 {
 		timestamp = getDBTimestampWithTx(tx)
 	}
+	var user User
+	if err := tx.Select("id", "role", "account_type").First(&user, userId).Error; err != nil {
+		return 0, err
+	}
+	monthlyQuota := SZUMonthlyQuotaForUser(&user)
 
 	grant := SZUMonthlyQuotaGrant{
 		UserId:     userId,
 		GrantMonth: szuGrantMonth(timestamp),
-		Amount:     SZUMonthlyFreeQuota,
+		Amount:     monthlyQuota,
 		GrantedAt:  timestamp,
 	}
 	result := tx.Clauses(clause.OnConflict{
@@ -166,15 +185,28 @@ func grantSZUMonthlyQuotaForUserWithTx(tx *gorm.DB, userId int, timestamp int64)
 		DoNothing: true,
 	}).Create(&grant)
 	if result.Error != nil {
-		return false, result.Error
+		return 0, result.Error
 	}
+	creditedQuota := monthlyQuota
 	if result.RowsAffected == 0 {
-		return false, nil
+		var existingGrant SZUMonthlyQuotaGrant
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("user_id = ? AND grant_month = ?", userId, grant.GrantMonth).
+			First(&existingGrant).Error; err != nil {
+			return 0, err
+		}
+		if existingGrant.Amount >= monthlyQuota {
+			return 0, nil
+		}
+		creditedQuota = monthlyQuota - existingGrant.Amount
+		if err := tx.Model(&existingGrant).Update("amount", monthlyQuota).Error; err != nil {
+			return 0, err
+		}
 	}
-	if err := creditTopUpQuota(tx, userId, SZUMonthlyFreeQuota, nil); err != nil {
-		return false, err
+	if err := creditTopUpQuota(tx, userId, creditedQuota, nil); err != nil {
+		return 0, err
 	}
-	return true, nil
+	return creditedQuota, nil
 }
 
 // EnsureSZUMonthlyQuotaForUserWithTx grants the current month's free quota.
@@ -191,14 +223,14 @@ func EnsureSZUMonthlyQuotaForUser(userId int) error {
 	if userId <= 0 {
 		return errors.New("invalid user id")
 	}
-	granted := false
+	creditedQuota := 0
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		var err error
-		granted, err = grantSZUMonthlyQuotaForUserWithTx(tx, userId, getDBTimestampWithTx(tx))
+		creditedQuota, err = grantSZUMonthlyQuotaForUserWithTx(tx, userId, getDBTimestampWithTx(tx))
 		return err
 	})
-	if err == nil && granted {
-		syncCreditUserQuotaCache(userId, SZUMonthlyFreeQuota, "monthly free quota")
+	if err == nil && creditedQuota > 0 {
+		syncCreditUserQuotaCache(userId, creditedQuota, "monthly free quota")
 	}
 	return err
 }
@@ -213,25 +245,29 @@ func GrantCurrentSZUMonthlyQuota() (int, error) {
 		return 0, err
 	}
 
-	grantedUserIDs := make([]int, 0)
+	type monthlyQuotaCredit struct {
+		userId int
+		amount int
+	}
+	credits := make([]monthlyQuotaCredit, 0)
 	for _, user := range users {
-		granted := false
+		creditedQuota := 0
 		err := DB.Transaction(func(tx *gorm.DB) error {
 			var err error
-			granted, err = grantSZUMonthlyQuotaForUserWithTx(tx, user.Id, now)
+			creditedQuota, err = grantSZUMonthlyQuotaForUserWithTx(tx, user.Id, now)
 			return err
 		})
 		if err != nil {
-			return len(grantedUserIDs), err
+			return len(credits), err
 		}
-		if granted {
-			grantedUserIDs = append(grantedUserIDs, user.Id)
+		if creditedQuota > 0 {
+			credits = append(credits, monthlyQuotaCredit{userId: user.Id, amount: creditedQuota})
 		}
 	}
-	for _, userId := range grantedUserIDs {
-		syncCreditUserQuotaCache(userId, SZUMonthlyFreeQuota, "monthly free quota")
+	for _, credit := range credits {
+		syncCreditUserQuotaCache(credit.userId, credit.amount, "monthly free quota")
 	}
-	return len(grantedUserIDs), nil
+	return len(credits), nil
 }
 
 // EnsureSZUMonthlyQuotaGrants migrates the previous subscription-based
@@ -366,13 +402,23 @@ func GetSZUQuotaLedger(userId int, startIdx int, num int) ([]SZUQuotaLedgerEntry
 }
 
 // Compatibility wrappers for older call sites. Their behavior is now a
-// wallet grant, not a subscription assignment.
-func SyncSZUEducationSubscriptionForUserWithTx(tx *gorm.DB, user *User) error {
-	return EnsureSZUMonthlyQuotaForUserWithTx(tx, user)
+// wallet grant, not a subscription assignment. The transactional variant
+// returns the amount credited so callers can update Redis only after commit.
+func SyncSZUEducationSubscriptionForUserWithTx(tx *gorm.DB, user *User) (int, error) {
+	if tx == nil || user == nil || user.Id <= 0 {
+		return 0, errors.New("invalid monthly quota user")
+	}
+	return grantSZUMonthlyQuotaForUserWithTx(tx, user.Id, getDBTimestampWithTx(tx))
 }
 
 func SyncSZUEducationSubscriptionForUser(userId int) error {
 	return EnsureSZUMonthlyQuotaForUser(userId)
+}
+
+// SyncSZUMonthlyQuotaCreditCache applies a committed monthly credit to an
+// existing Redis user hash. Cache misses remain database-authoritative.
+func SyncSZUMonthlyQuotaCreditCache(userId int, quota int) {
+	syncCreditUserQuotaCache(userId, quota, "monthly free quota")
 }
 
 func EnsureSZUEducationPlansAndSubscriptions() error {

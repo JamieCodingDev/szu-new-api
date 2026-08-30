@@ -61,13 +61,12 @@ export function useSidebarData(): SidebarData {
             icon: Ticket,
           },
         ]
-      : [
-          {
-            title: t('Redeem Code'),
-            url: '/wallet?view=redeem',
-            icon: Gift,
-          },
-        ]),
+      : []),
+    {
+      title: t('Redeem Code'),
+      url: '/wallet?view=redeem',
+      icon: Gift,
+    },
     {
       title: t('Account Billing'),
       url: '/wallet?view=billing',
