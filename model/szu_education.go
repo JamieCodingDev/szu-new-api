@@ -52,6 +52,7 @@ type SZUQuotaLedgerEntry struct {
 	Amount      int    `json:"amount"`
 	CreatedAt   int64  `json:"created_at"`
 	Description string `json:"description"`
+	GrantMonth  string `json:"grant_month,omitempty"`
 }
 
 func NormalizeAccountType(accountType string) string {
@@ -331,11 +332,11 @@ func GetSZUQuotaLedger(userId int, startIdx int, num int) ([]SZUQuotaLedgerEntry
 	entries := make([]SZUQuotaLedgerEntry, 0, len(grants)+len(redemptions))
 	for _, grant := range grants {
 		entries = append(entries, SZUQuotaLedgerEntry{
-			Id:          fmt.Sprintf("monthly-%d", grant.Id),
-			Source:      "monthly",
-			Amount:      grant.Amount,
-			CreatedAt:   grant.GrantedAt,
-			Description: grant.GrantMonth + " monthly free quota",
+			Id:         fmt.Sprintf("monthly-%d", grant.Id),
+			Source:     "monthly",
+			Amount:     grant.Amount,
+			CreatedAt:  grant.GrantedAt,
+			GrantMonth: grant.GrantMonth,
 		})
 	}
 	for _, redemption := range redemptions {

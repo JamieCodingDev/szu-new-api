@@ -5590,6 +5590,7 @@
     "The ledger contains only monthly free grants and redemption code credits.": "The ledger contains only monthly free grants and redemption code credits.",
     "There is no separate monthly balance or redemption balance.": "There is no separate monthly balance or redemption balance.",
     "Unified Available Quota": "Unified Available Quota",
-    "Usage records contain only the total API call count and total token count for the selected period.": "Usage records contain only the total API call count and total token count for the selected period."
+    "Usage records contain only the total API call count and total token count for the selected period.": "Usage records contain only the total API call count and total token count for the selected period.",
+    "{{month}} monthly free quota": "{{month}} monthly free quota"
   }
 }

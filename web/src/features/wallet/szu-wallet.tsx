@@ -59,6 +59,7 @@ interface QuotaLedgerEntry {
   amount: number
   created_at: number
   description: string
+  grant_month?: string
 }
 
 interface QuotaSnapshot {
@@ -301,7 +302,13 @@ function BillingView({
                               ? t('Monthly Free Quota')
                               : t('Redemption Code')}
                           </TableCell>
-                          <TableCell>{entry.description || '-'}</TableCell>
+                          <TableCell>
+                            {entry.source === 'monthly' && entry.grant_month
+                              ? t('{{month}} monthly free quota', {
+                                  month: entry.grant_month,
+                                })
+                              : entry.description || '-'}
+                          </TableCell>
                           <TableCell className='text-right font-medium tabular-nums'>
                             +{formatNumber(entry.amount)}
                           </TableCell>

@@ -5590,6 +5590,7 @@
     "The ledger contains only monthly free grants and redemption code credits.": "帳單僅記錄每月免費額度發放和兌換碼額度收入。",
     "There is no separate monthly balance or redemption balance.": "不區分月度餘額和兌換碼餘額，所有額度統一計入帳戶可用餘額。",
     "Unified Available Quota": "統一可用額度",
-    "Usage records contain only the total API call count and total token count for the selected period.": "用量記錄僅統計所選時間段內的 API 呼叫總次數和 Token 總數。"
+    "Usage records contain only the total API call count and total token count for the selected period.": "用量記錄僅統計所選時間段內的 API 呼叫總次數和 Token 總數。",
+    "{{month}} monthly free quota": "{{month}} 每月免費額度"
   }
 }

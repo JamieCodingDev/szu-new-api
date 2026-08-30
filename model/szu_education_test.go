@@ -86,6 +86,8 @@ func TestSZUQuotaLedgerCombinesMonthlyAndRedemptionIncome(t *testing.T) {
 	assert.Equal(t, 25_000, entries[0].Amount)
 	assert.Equal(t, "monthly", entries[1].Source)
 	assert.Equal(t, SZUMonthlyFreeQuota, entries[1].Amount)
+	assert.Equal(t, "2026-08", entries[1].GrantMonth)
+	assert.Empty(t, entries[1].Description)
 
 	require.NoError(t, DB.First(&user, user.Id).Error)
 	assert.Equal(t, SZUMonthlyFreeQuota+25_000, user.Quota)
