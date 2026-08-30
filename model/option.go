@@ -141,9 +141,12 @@ func InitOptionMap() {
 	common.OptionMap["WeChatAccountQRCodeImageURL"] = ""
 	common.OptionMap["TurnstileSiteKey"] = ""
 	common.OptionMap["TurnstileSecretKey"] = ""
-	common.OptionMap["QuotaForNewUser"] = strconv.Itoa(common.QuotaForNewUser)
-	common.OptionMap["QuotaForInviter"] = strconv.Itoa(common.QuotaForInviter)
-	common.OptionMap["QuotaForInvitee"] = strconv.Itoa(common.QuotaForInvitee)
+	common.QuotaForNewUser = 0
+	common.QuotaForInviter = 0
+	common.QuotaForInvitee = 0
+	common.OptionMap["QuotaForNewUser"] = "0"
+	common.OptionMap["QuotaForInviter"] = "0"
+	common.OptionMap["QuotaForInvitee"] = "0"
 	common.OptionMap["QuotaRemindThreshold"] = strconv.Itoa(common.QuotaRemindThreshold)
 	common.OptionMap["PreConsumedQuota"] = strconv.Itoa(common.PreConsumedQuota)
 	common.OptionMap["ModelRequestRateLimitCount"] = strconv.Itoa(setting.ModelRequestRateLimitCount)
@@ -291,6 +294,11 @@ func updateOptionMap(key string, value string) (err error) {
 		delete(common.OptionMap, key)
 		common.OptionMapRWMutex.Unlock()
 		return nil
+	}
+	// This deployment has exactly two quota sources: the monthly system grant
+	// and redemption codes. Ignore legacy registration/invitation grants.
+	if key == "QuotaForNewUser" || key == "QuotaForInviter" || key == "QuotaForInvitee" {
+		value = "0"
 	}
 	common.OptionMapRWMutex.Lock()
 	defer common.OptionMapRWMutex.Unlock()

@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import type { Row } from '@tanstack/react-table'
-import { Trash2, Edit, Power, PowerOff } from 'lucide-react'
+import { Edit, Power, PowerOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -25,7 +25,6 @@ import { DataTableRowActionMenu } from '@/components/data-table/core/row-action-
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuShortcut,
 } from '@/components/ui/dropdown-menu'
 import {
@@ -117,19 +116,6 @@ export function DataTableRowActions<TData>({
             )}
           </DropdownMenuItem>
         )}
-        {canToggle && <DropdownMenuSeparator />}
-        <DropdownMenuItem
-          onClick={() => {
-            setCurrentRow(redemption)
-            setOpen('delete')
-          }}
-          className='text-destructive focus:text-destructive'
-        >
-          {t('Delete')}
-          <DropdownMenuShortcut>
-            <Trash2 size={16} />
-          </DropdownMenuShortcut>
-        </DropdownMenuItem>
       </DataTableRowActionMenu>
     </div>
   )

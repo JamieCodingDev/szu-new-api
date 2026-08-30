@@ -19,10 +19,9 @@ For commercial licensing, please contact support@quantumnous.com
 import { createFileRoute, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/(auth)/register')({
-  beforeLoad: ({ location }) => {
+  beforeLoad: () => {
     throw redirect({
-      to: '/sign-up',
-      search: location.search,
+      to: '/sign-in',
       replace: true,
     })
   },

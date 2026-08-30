@@ -31,7 +31,6 @@ const i18n = (await import('i18next')).default
 const { I18nextProvider, initReactI18next } = await import('react-i18next')
 const { Toaster, toast } = await import('sonner')
 const { api } = await import('@/lib/api')
-const { useSystemConfigStore } = await import('@/stores/system-config-store')
 const { RedemptionsProvider } = await import('../redemptions-provider')
 const { RedemptionsMutateDrawer } = await import('../redemptions-mutate-drawer')
 
@@ -57,11 +56,6 @@ type MockableApi = {
 type RenderedDrawer = {
   result: RenderResult
 }
-type CurrencyFixture = {
-  quotaDisplayType: 'USD' | 'CNY'
-  usdExchangeRate: number
-}
-
 const apiClient = api as unknown as MockableApi
 const originalGet = apiClient.get
 const originalPut = apiClient.put
@@ -108,24 +102,7 @@ function drawerTree(currentRow: Redemption) {
   )
 }
 
-async function renderDrawer(
-  currentRow: Redemption,
-  currency: CurrencyFixture = {
-    quotaDisplayType: 'USD',
-    usdExchangeRate: 1,
-  }
-): Promise<void> {
-  useSystemConfigStore.getState().setConfig({
-    currency: {
-      displayInCurrency: true,
-      quotaDisplayType: currency.quotaDisplayType,
-      quotaPerUnit: 500000,
-      usdExchangeRate: currency.usdExchangeRate,
-      customCurrencySymbol: '¤',
-      customCurrencyExchangeRate: 1,
-    },
-  })
-
+async function renderDrawer(currentRow: Redemption): Promise<void> {
   renderedDrawer = { result: render(drawerTree(currentRow)) }
 }
 
@@ -141,8 +118,7 @@ function getSaveButton(): HTMLButtonElement {
 }
 
 function getControlByLabel(labelText: 'Name'): HTMLInputElement
-function getControlByLabel(labelText: 'Quota (CNY)'): HTMLInputElement
-function getControlByLabel(labelText: 'Quota (USD)'): HTMLInputElement
+function getControlByLabel(labelText: 'Quota Points'): HTMLInputElement
 function getControlByLabel(labelText: string): HTMLElement {
   const label = [...document.querySelectorAll<HTMLLabelElement>('label')].find(
     (candidate) => candidate.textContent?.trim() === labelText
@@ -187,17 +163,14 @@ afterEach(() => {
 })
 
 describe('redemption drawer', () => {
-  test('shows the reported CNY quota without floating-point noise', async () => {
+  test('shows the exact quota point amount', async () => {
     const original = redemption(1, 13888889)
     apiClient.get = async () => ({ data: { success: true, data: original } })
 
-    await renderDrawer(original, {
-      quotaDisplayType: 'CNY',
-      usdExchangeRate: 7.2,
-    })
+    await renderDrawer(original)
     await waitForLoadedForm()
 
-    expect(getControlByLabel('Quota (CNY)').value).toBe('200')
+    expect(getControlByLabel('Quota Points').value).toBe('13888889')
   })
 
   test('blocks updates and reports an error when loading rejects', async () => {
@@ -247,7 +220,7 @@ describe('redemption drawer', () => {
 
     await renderDrawer(original)
     await waitForLoadedForm()
-    expect(getControlByLabel('Quota (USD)').value).toBe('1')
+    expect(getControlByLabel('Quota Points').value).toBe('500001')
 
     changeInput(getControlByLabel('Name'), 'renamed')
     submitForm()
@@ -269,11 +242,11 @@ describe('redemption drawer', () => {
 
     await renderDrawer(original)
     await waitForLoadedForm()
-    changeInput(getControlByLabel('Quota (USD)'), '2')
+    changeInput(getControlByLabel('Quota Points'), '200000')
     submitForm()
     await waitFor(() => expect(updates).toHaveLength(1))
 
-    expect(updates[0]?.quota).toBe(1000000)
+    expect(updates[0]?.quota).toBe(200000)
   })
 
   test('ignores an older response after switching records', async () => {

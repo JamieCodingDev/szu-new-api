@@ -33,6 +33,7 @@ func setupManageUserTestDB(t *testing.T) *gorm.DB {
 	model.DB, model.LOG_DB = db, db
 	require.NoError(t, db.AutoMigrate(
 		&model.User{}, &model.UserSession{}, &model.Log{}, &model.CasbinRule{}, &model.AuthzRole{},
+		&model.SubscriptionPlan{}, &model.UserSubscription{}, &model.SZUMonthlyQuotaGrant{},
 	))
 
 	t.Cleanup(func() {
@@ -123,6 +124,7 @@ func TestManageUserDemoteAdvancesAuthVersionAndRevokesSessionsOnce(t *testing.T)
 	var updated model.User
 	require.NoError(t, db.First(&updated, user.Id).Error)
 	assert.Equal(t, common.RoleCommonUser, updated.Role)
+	assert.Equal(t, model.AccountTypeTeacher, updated.AccountType)
 	assert.EqualValues(t, 2, updated.AuthVersion)
 	var sessions []model.UserSession
 	require.NoError(t, db.Where("user_id = ?", user.Id).Order("sid asc").Find(&sessions).Error)
@@ -179,4 +181,128 @@ func TestManageUserQuotaRespectsWalletCeiling(t *testing.T) {
 	assert.Contains(t, recorder.Body.String(), `"success":false`)
 	require.NoError(t, db.First(&updated, user.Id).Error)
 	assert.Equal(t, common.MaxWalletQuota-1, updated.Quota)
+}
+
+func TestManageUserQuotaChangesAreDisabledInQuotaOnlyMode(t *testing.T) {
+	db := setupManageUserTestDB(t)
+	user := model.User{
+		Username: "managed-quota-only-user", Password: "password", Role: common.RoleCommonUser,
+		Status: common.UserStatusEnabled, Group: "default", Quota: 123,
+	}
+	require.NoError(t, db.Create(&user).Error)
+
+	recorder := performManageUserRequest(t, fmt.Sprintf(`{"id":%d,"action":"add_quota","mode":"add","value":100000}`, user.Id))
+	assert.Contains(t, recorder.Body.String(), `"success":false`)
+	assert.Contains(t, recorder.Body.String(), "quota can only be granted monthly or through redemption codes")
+
+	var updated model.User
+	require.NoError(t, db.First(&updated, user.Id).Error)
+	assert.Equal(t, 123, updated.Quota)
+}
+
+func TestManagedUserResponseOmitsGroupsInvitationsAndCredentials(t *testing.T) {
+	db := setupManageUserTestDB(t)
+	user := model.User{
+		Username:    "managed-contract-user",
+		Password:    "password",
+		Role:        common.RoleCommonUser,
+		Status:      common.UserStatusEnabled,
+		Group:       "legacy-vip",
+		AffCode:     "private-affiliate-code",
+		AffCount:    3,
+		AffQuota:    100,
+		InviterId:   42,
+		AccountType: model.AccountTypeStudent,
+	}
+	require.NoError(t, db.Create(&user).Error)
+
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/user/?p=1&page_size=10", nil)
+	GetAllUsers(c)
+
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	var response struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Items []map[string]interface{} `json:"items"`
+		} `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &response))
+	require.True(t, response.Success)
+	require.Len(t, response.Data.Items, 1)
+	item := response.Data.Items[0]
+	assert.Equal(t, model.ManagedRoleStudent, item["managed_role"])
+	for _, hiddenField := range []string{
+		"password", "original_password", "group", "aff_code", "aff_count",
+		"aff_quota", "aff_history_quota", "inviter_id",
+	} {
+		_, exists := item[hiddenField]
+		assert.False(t, exists, "managed user response must omit %s", hiddenField)
+	}
+}
+
+func TestCreateManagedUserUsesOneIdentifierAndOneBusinessRole(t *testing.T) {
+	db := setupManageUserTestDB(t)
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/user/", strings.NewReader(`{
+		"username":"Teacher@Example.ORG",
+		"password":"password123",
+		"managed_role":"teacher"
+	}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("id", 9999)
+	c.Set("role", common.RoleAdminUser)
+	c.Set("username", "admin-operator")
+
+	CreateUser(c)
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), `"success":true`)
+
+	var created model.User
+	require.NoError(t, db.Where("username = ?", "teacher@example.org").First(&created).Error)
+	assert.Equal(t, "teacher@example.org", created.Email)
+	assert.Equal(t, "teacher@example.org", created.DisplayName)
+	assert.Equal(t, common.RoleCommonUser, created.Role)
+	assert.Equal(t, model.AccountTypeTeacher, created.AccountType)
+	assert.Equal(t, model.ManagedRoleTeacher, model.ManagedRoleForUser(&created))
+}
+
+func TestUpdateManagedUserSynchronizesAdministratorRoleAndIdentity(t *testing.T) {
+	db := setupManageUserTestDB(t)
+	user := model.User{
+		Username: "managed-update-user", Password: "password", Role: common.RoleCommonUser,
+		AccountType: model.AccountTypeStudent, Status: common.UserStatusEnabled, Group: "default", AuthVersion: 1,
+	}
+	require.NoError(t, db.Create(&user).Error)
+
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPut, "/api/user/", strings.NewReader(fmt.Sprintf(`{
+		"id":%d,
+		"username":"Admin@Example.ORG",
+		"managed_role":"admin"
+	}`, user.Id)))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("id", 9999)
+	c.Set("role", common.RoleRootUser)
+	c.Set("username", "root-operator")
+
+	UpdateUser(c)
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), `"success":true`)
+
+	var updated model.User
+	require.NoError(t, db.First(&updated, user.Id).Error)
+	assert.Equal(t, "admin@example.org", updated.Username)
+	assert.Equal(t, "admin@example.org", updated.Email)
+	assert.Equal(t, "admin@example.org", updated.DisplayName)
+	assert.Equal(t, common.RoleAdminUser, updated.Role)
+	assert.Equal(t, model.AccountTypeTeacher, updated.AccountType)
+	assert.Equal(t, model.ManagedRoleAdmin, model.ManagedRoleForUser(&updated))
+	assert.EqualValues(t, 2, updated.AuthVersion)
 }

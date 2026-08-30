@@ -20,7 +20,6 @@ import dayjs from '@/lib/dayjs'
 
 import {
   formatCurrencyFromUSD,
-  formatQuotaWithCurrency,
   getCurrencyDisplay,
   getCurrencyFractionDigits,
 } from './currency'
@@ -63,19 +62,15 @@ export function formatCurrencyUSD(value: number | null | undefined): string {
 }
 
 // ============================================================================
-// Quota Formatting (500,000 units = $1)
+// Quota Formatting
 // ============================================================================
 
 /**
- * Format quota into the configured display amount.
- * Quota is stored in units where `quotaPerUnit` equals 1 USD.
+ * Format quota as raw quota points. This deployment is quota-only and does
+ * not present quota as money.
  */
 export function formatQuota(quota: number): string {
-  return formatQuotaWithCurrency(quota, {
-    digitsLarge: 2,
-    digitsSmall: 4,
-    abbreviate: true,
-  })
+  return formatNumber(quota)
 }
 
 /**
@@ -230,16 +225,9 @@ export function formatTimeStr(date: Date): string {
   return dayjs(date).format('HH:mm:ss')
 }
 
-/**
- * Format quota for usage logs with higher precision
- * Uses 6 decimal places to show very small costs accurately
- */
+/** Format quota points in usage logs without monetary conversion. */
 export function formatLogQuota(quota: number): string {
-  return formatQuotaWithCurrency(quota, {
-    digitsLarge: 4,
-    digitsSmall: 6,
-    abbreviate: false,
-  })
+  return formatNumber(quota)
 }
 
 /**

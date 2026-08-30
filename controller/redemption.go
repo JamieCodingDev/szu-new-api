@@ -63,7 +63,7 @@ func GetRedemption(c *gin.Context) {
 }
 
 func AddRedemption(c *gin.Context) {
-	if !operation_setting.IsPaymentComplianceConfirmed() {
+	if !common.SZUQuotaOnlyMode && !operation_setting.IsPaymentComplianceConfirmed() {
 		common.ApiErrorI18n(c, i18n.MsgPaymentComplianceRequired)
 		return
 	}
@@ -78,6 +78,9 @@ func AddRedemption(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgRedemptionNameLength)
 		return
 	}
+	// One request creates exactly one durable code. Bulk generation is disabled
+	// so each code has an explicit, auditable creation event.
+	redemption.Count = 1
 	if redemption.Count <= 0 {
 		common.ApiErrorI18n(c, i18n.MsgRedemptionCountPositive)
 		return

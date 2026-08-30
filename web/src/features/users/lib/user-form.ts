@@ -23,23 +23,25 @@ import {
   type AdminPermissionMatrix,
   normalizeAdminPermissions,
 } from '@/lib/admin-permissions'
-import { quotaUnitsToDollars } from '@/lib/format'
-import { ROLE } from '@/lib/roles'
 
-import { DEFAULT_GROUP } from '../constants'
-import { type UserFormData, type User } from '../types'
+import type { UserFormData, User } from '../types'
 
 // ============================================================================
 // Form Schema
 // ============================================================================
 
 export const userFormSchema = z.object({
-  username: z.string().min(1, 'Username is required'),
-  display_name: z.string().optional(),
+  username: z
+    .string()
+    .trim()
+    .min(1, 'Username or email is required')
+    .max(50, 'Username or email must not exceed 50 characters')
+    .refine(
+      (value) => !value.includes('@') || z.email().safeParse(value).success,
+      'Please enter a valid email address'
+    ),
   password: z.string().optional(),
-  role: z.number().optional(),
-  quota_dollars: z.number().min(0).optional(),
-  group: z.string().optional(),
+  managed_role: z.enum(['admin', 'teacher', 'student']),
   remark: z.string().optional(),
   admin_permissions: z
     .record(z.string(), z.record(z.string(), z.boolean()))
@@ -54,11 +56,8 @@ export type UserFormValues = z.infer<typeof userFormSchema>
 
 export const USER_FORM_DEFAULT_VALUES: UserFormValues = {
   username: '',
-  display_name: '',
   password: '',
-  role: 1, // Default to common user
-  quota_dollars: 0,
-  group: DEFAULT_GROUP,
+  managed_role: 'student',
   remark: '',
   // Filled against the backend catalog at render time; see UsersMutateDrawer.
   admin_permissions: {},
@@ -77,29 +76,24 @@ export function transformFormDataToPayload(
   catalog?: PermissionCatalog
 ): UserFormData & { id?: number } {
   const payload: UserFormData & { id?: number } = {
-    username: data.username,
-    display_name: data.display_name || data.username,
+    username: data.username.trim(),
     password: data.password || undefined,
+    managed_role: data.managed_role,
   }
-
-  const role = userId === undefined ? data.role || 1 : (data.role ?? 0)
 
   // Only send the permission matrix when the target is an admin and the catalog
   // is available; without the catalog we cannot build a full matrix, so we omit
   // the field (the backend then leaves existing permissions untouched).
-  if (role >= ROLE.ADMIN && catalog) {
+  if (data.managed_role === 'admin' && catalog) {
     payload.admin_permissions = normalizeAdminPermissions(
       data.admin_permissions as AdminPermissionMatrix | undefined,
       catalog
     )
   }
 
-  // For create: only send required fields
-  if (userId === undefined) {
-    payload.role = role
-  } else {
-    // For update: quota is adjusted atomically via /api/user/manage, not sent here
-    payload.group = data.group
+  if (userId !== undefined) {
+    // Quota and group are not administrator-editable. Quota only comes from
+    // monthly grants and redemption codes; routing always uses the default group.
     payload.remark = data.remark || undefined
     payload.id = userId
   }
@@ -115,11 +109,8 @@ export function transformFormDataToPayload(
 export function transformUserToFormDefaults(user: User): UserFormValues {
   return {
     username: user.username,
-    display_name: user.display_name,
     password: '',
-    role: user.role,
-    quota_dollars: quotaUnitsToDollars(user.quota),
-    group: user.group || DEFAULT_GROUP,
+    managed_role: user.managed_role,
     remark: user.remark || '',
     admin_permissions: user.admin_permissions ?? {},
   }

@@ -17,7 +17,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-const UserNameMaxLength = 20
+const UserNameMaxLength = 50
 
 var userSortColumns = map[string]string{
 	"id":            "id",
@@ -78,11 +78,13 @@ func resolveUserSortOptions(sortOptions []UserSortOptions) UserSortOptions {
 // Otherwise, the sensitive information will be saved on local storage in plain text!
 type User struct {
 	Id               int                        `json:"id"`
-	Username         string                     `json:"username" gorm:"unique;index" validate:"max=20"`
+	Username         string                     `json:"username" gorm:"unique;index" validate:"max=50"`
 	Password         string                     `json:"password" gorm:"not null;" validate:"min=8,max=20"`
 	OriginalPassword string                     `json:"original_password" gorm:"-:all"` // this field is only for Password change verification, don't save it to database!
-	DisplayName      string                     `json:"display_name" gorm:"index" validate:"max=20"`
-	Role             int                        `json:"role" gorm:"type:int;default:1"`   // admin, common
+	DisplayName      string                     `json:"display_name" gorm:"index" validate:"max=50"`
+	Role             int                        `json:"role" gorm:"type:int;default:1"` // admin, common
+	AccountType      string                     `json:"account_type" gorm:"type:varchar(16);not null;default:'student';index" validate:"omitempty,oneof=student teacher"`
+	ManagedRole      string                     `json:"managed_role" gorm:"-:all" validate:"omitempty,oneof=admin teacher student"`
 	Status           int                        `json:"status" gorm:"type:int;default:1"` // enabled, disabled
 	Email            string                     `json:"email" gorm:"index" validate:"max=50"`
 	GitHubId         string                     `json:"github_id" gorm:"column:github_id;index"`
@@ -119,6 +121,7 @@ func (user *User) ToBaseUser() *UserBase {
 		Quota:       user.Quota,
 		Status:      user.Status,
 		Role:        user.Role,
+		AccountType: NormalizeAccountType(user.AccountType),
 		Username:    user.Username,
 		Setting:     user.Setting,
 		Email:       user.Email,
@@ -421,7 +424,7 @@ func GetAllUsers(pageInfo *common.PageInfo, sortOptions ...UserSortOptions) (use
 	return users, total, nil
 }
 
-func SearchUsers(keyword string, group string, role *int, status *int, startIdx int, num int, sortOptions ...UserSortOptions) ([]*User, int64, error) {
+func SearchUsers(keyword string, group string, managedRole string, status *int, startIdx int, num int, sortOptions ...UserSortOptions) ([]*User, int64, error) {
 	var users []*User
 	var total int64
 	var err error
@@ -456,8 +459,15 @@ func SearchUsers(keyword string, group string, role *int, status *int, startIdx 
 	if group != "" {
 		query = query.Where(commonGroupCol+" = ?", group)
 	}
-	if role != nil {
-		query = query.Where("role = ?", *role)
+	if normalizedRole, ok := ParseManagedRole(managedRole); ok {
+		switch normalizedRole {
+		case ManagedRoleAdmin:
+			query = query.Where("role >= ?", common.RoleAdminUser)
+		case ManagedRoleTeacher:
+			query = query.Where("role < ? AND account_type = ?", common.RoleAdminUser, AccountTypeTeacher)
+		case ManagedRoleStudent:
+			query = query.Where("role < ? AND account_type = ?", common.RoleAdminUser, AccountTypeStudent)
+		}
 	}
 	if status != nil {
 		if *status == -1 {
@@ -582,6 +592,7 @@ func (user *User) TransferAffQuotaToQuota(quota int) error {
 }
 
 func (user *User) prepareForInsert(tx *gorm.DB) error {
+	user.AccountType = NormalizeAccountType(user.AccountType)
 	user.Email = NormalizeEmail(user.Email)
 	if err := ensureEmailAvailableWithTx(tx, user.Email, 0); err != nil {
 		return err
@@ -785,7 +796,8 @@ func (user *User) UpdateWithTx(tx *gorm.DB, updatePassword bool) error {
 	authChanged := (updatePassword && current.Password != newUser.Password) ||
 		(newUser.Role != 0 && current.Role != newUser.Role) ||
 		(newUser.Status != 0 && current.Status != newUser.Status) ||
-		(newUser.Group != "" && current.Group != newUser.Group)
+		(newUser.Group != "" && current.Group != newUser.Group) ||
+		(newUser.AccountType != "" && current.AccountType != newUser.AccountType)
 	if authChanged {
 		newUser.AuthVersion, err = IncrementUserAuthVersionWithTx(tx, user.Id)
 		if err != nil {
@@ -837,31 +849,47 @@ func (user *User) EditWithTx(tx *gorm.DB, updatePassword bool) error {
 	}
 
 	newUser := *user
-	updates := map[string]interface{}{
-		"username":     newUser.Username,
-		"display_name": newUser.DisplayName,
-		"group":        newUser.Group,
-		"remark":       newUser.Remark,
-	}
-	if updatePassword {
-		updates["password"] = newUser.Password
-	}
+	newUser.AccountType = NormalizeAccountType(newUser.AccountType)
+	newUser.Email = NormalizeEmail(newUser.Email)
 
-	current := User{}
-	if err = tx.First(&current, user.Id).Error; err != nil {
-		return err
-	}
-	authChanged := (updatePassword && current.Password != newUser.Password) || current.Group != newUser.Group
-	if authChanged {
-		newUser.AuthVersion, err = IncrementUserAuthVersionWithTx(tx, user.Id)
-		if err != nil {
+	return withNormalizedEmailLock(tx, newUser.Email, func(lockedTx *gorm.DB) error {
+		if err := ensureEmailAvailableWithTx(lockedTx, newUser.Email, user.Id); err != nil {
 			return err
 		}
-	}
-	if err = tx.Model(&current).Updates(updates).Error; err != nil {
-		return err
-	}
-	return tx.First(user, user.Id).Error
+
+		updates := map[string]interface{}{
+			"username":     newUser.Username,
+			"display_name": newUser.DisplayName,
+			"email":        newUser.Email,
+			"role":         newUser.Role,
+			"account_type": newUser.AccountType,
+			"group":        "default",
+			"remark":       newUser.Remark,
+		}
+		if updatePassword {
+			updates["password"] = newUser.Password
+		}
+
+		current := User{}
+		if err = lockedTx.First(&current, user.Id).Error; err != nil {
+			return err
+		}
+		authChanged := (updatePassword && current.Password != newUser.Password) ||
+			current.Username != newUser.Username ||
+			current.Email != newUser.Email ||
+			current.Role != newUser.Role ||
+			current.AccountType != newUser.AccountType
+		if authChanged {
+			newUser.AuthVersion, err = IncrementUserAuthVersionWithTx(lockedTx, user.Id)
+			if err != nil {
+				return err
+			}
+		}
+		if err = lockedTx.Model(&current).Updates(updates).Error; err != nil {
+			return err
+		}
+		return lockedTx.First(user, user.Id).Error
+	})
 }
 
 func (user *User) ClearBinding(bindingType string) error {

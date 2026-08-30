@@ -33,7 +33,7 @@ import type {
   DashboardFilters,
 } from '@/features/dashboard/types'
 import { toIntlLocale } from '@/i18n/languages'
-import { formatCompactNumber, formatNumber, formatQuota } from '@/lib/format'
+import { formatCompactNumber, formatNumber } from '@/lib/format'
 import { computeTimeRange } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
@@ -71,8 +71,6 @@ export function LogStatCards(props: LogStatCardsProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
-  const [timeRangeMinutes, setTimeRangeMinutes] = useState(0)
-
   const { filters, onDataUpdate } = props
 
   useEffect(() => {
@@ -88,9 +86,6 @@ export function LogStatCards(props: LogStatCardsProps) {
       filters?.start_timestamp,
       filters?.end_timestamp
     )
-    const timeDiff = (timeRange.end_timestamp - timeRange.start_timestamp) / 60
-    setTimeRangeMinutes(timeDiff)
-
     void getUserQuotaDates(buildQueryParams(timeRange, filters), isAdmin)
       .then((res) => {
         if (abortController.signal.aborted) return
@@ -122,15 +117,9 @@ export function LogStatCards(props: LogStatCardsProps) {
   }
 
   const items = statCardsConfig.map((config) => {
-    const rawValue = config.getValue(adaptedStats, timeRangeMinutes)
+    const rawValue = config.getValue(adaptedStats)
     const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
-    const formatted =
-      config.key === 'quota'
-        ? {
-            displayValue: formatQuota(rawValue),
-            fullValue: formatQuota(rawValue),
-          }
-        : formatStatNumber(rawValue, locale)
+    const formatted = formatStatNumber(rawValue, locale)
 
     return {
       title: config.title,
@@ -144,7 +133,7 @@ export function LogStatCards(props: LogStatCardsProps) {
 
   return (
     <div className='overflow-hidden rounded-lg border'>
-      <div className='divide-border/60 grid min-w-0 grid-cols-2 divide-x sm:grid-cols-3 lg:grid-cols-5'>
+      <div className='divide-border/60 grid min-w-0 grid-cols-2 divide-x'>
         {items.map((it, idx) => {
           const Icon = it.icon
           let valueContent

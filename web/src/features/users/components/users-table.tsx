@@ -50,7 +50,6 @@ const USER_SORTABLE_COLUMNS = new Set<UserSortBy>([
   'id',
   'username',
   'quota',
-  'group',
   'created_at',
   'last_login_at',
 ])
@@ -81,8 +80,7 @@ export function UsersTable() {
     globalFilter: { enabled: true, key: 'filter' },
     columnFilters: [
       { columnId: 'status', searchKey: 'status', type: 'array' },
-      { columnId: 'role', searchKey: 'role', type: 'array' },
-      { columnId: 'group', searchKey: 'group', type: 'string' },
+      { columnId: 'managed_role', searchKey: 'role', type: 'array' },
     ],
   })
   const statusFilter =
@@ -90,13 +88,9 @@ export function UsersTable() {
       | string[]
       | undefined) ?? []
   const roleFilter =
-    (columnFilters.find((filter) => filter.id === 'role')?.value as
+    (columnFilters.find((filter) => filter.id === 'managed_role')?.value as
       | string[]
       | undefined) ?? []
-  const groupFilter =
-    (columnFilters.find((filter) => filter.id === 'group')?.value as string) ??
-    ''
-
   const sortParams = useMemo(() => {
     const activeSort = sorting[0]
     if (
@@ -128,14 +122,12 @@ export function UsersTable() {
       globalFilter,
       statusFilter,
       roleFilter,
-      groupFilter,
       sortParams,
       refreshTrigger,
     ],
     queryFn: async () => {
       const hasFilter = globalFilter?.trim()
-      const hasColumnFilter =
-        statusFilter.length > 0 || roleFilter.length > 0 || Boolean(groupFilter)
+      const hasColumnFilter = statusFilter.length > 0 || roleFilter.length > 0
       const params = {
         p: pagination.pageIndex + 1,
         page_size: pagination.pageSize,
@@ -149,7 +141,6 @@ export function UsersTable() {
               keyword: globalFilter,
               status: statusFilter[0] ?? '',
               role: roleFilter[0] ?? '',
-              group: groupFilter,
             })
           : await getUsers(params)
 
@@ -180,11 +171,7 @@ export function UsersTable() {
     sorting,
     globalFilterFn: (row, _columnId, filterValue) => {
       const searchValue = String(filterValue).toLowerCase()
-      const fields = [
-        row.getValue('username'),
-        row.original.display_name,
-        row.original.email,
-      ]
+      const fields = [row.getValue('username')]
       return fields.some((field) =>
         String(field || '')
           .toLowerCase()
@@ -215,7 +202,7 @@ export function UsersTable() {
       skeletonKeyPrefix='users-skeleton'
       applyHeaderSize
       toolbarProps={{
-        searchPlaceholder: t('Filter by username, name or email...'),
+        searchPlaceholder: t('Filter by username or email...'),
         searchDebounceMs: 500,
         filters: [
           {
@@ -225,20 +212,17 @@ export function UsersTable() {
             singleSelect: true,
           },
           {
-            columnId: 'role',
+            columnId: 'managed_role',
             title: t('Role'),
             options: getUserRoleOptions(t),
             singleSelect: true,
           },
         ],
       }}
-      getRowClassName={(row, { isMobile }) =>
-        isDisabledUserRow(row.original)
-          ? isMobile
-            ? DISABLED_ROW_MOBILE
-            : DISABLED_ROW_DESKTOP
-          : undefined
-      }
+      getRowClassName={(row, { isMobile }) => {
+        if (!isDisabledUserRow(row.original)) return undefined
+        return isMobile ? DISABLED_ROW_MOBILE : DISABLED_ROW_DESKTOP
+      }}
       bulkActions={<DataTableBulkActions table={table} />}
     />
   )

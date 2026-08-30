@@ -32,10 +32,9 @@ const usersSearchSchema = z.object({
     .optional()
     .catch([]),
   role: z
-    .array(z.enum(['1', '10', '100']))
+    .array(z.enum(['admin', 'teacher', 'student']))
     .optional()
     .catch([]),
-  group: z.string().optional().catch(''),
 })
 
 export const Route = createFileRoute('/_authenticated/users/')({

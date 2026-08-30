@@ -138,19 +138,16 @@ export function BasicAuthSection({ defaultValues }: BasicAuthSectionProps) {
           <FormField
             control={form.control}
             name='RegisterEnabled'
-            render={({ field }) => (
+            render={() => (
               <SettingsSwitchItem>
                 <SettingsSwitchContent>
                   <FormLabel>{t('Registration Enabled')}</FormLabel>
                   <FormDescription>
-                    {t('Allow new users to register')}
+                    {t('Accounts can only be created by administrators')}
                   </FormDescription>
                 </SettingsSwitchContent>
                 <FormControl>
-                  <Switch
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
+                  <Switch checked={false} disabled />
                 </FormControl>
               </SettingsSwitchItem>
             )}
@@ -159,19 +156,16 @@ export function BasicAuthSection({ defaultValues }: BasicAuthSectionProps) {
           <FormField
             control={form.control}
             name='PasswordRegisterEnabled'
-            render={({ field }) => (
+            render={() => (
               <SettingsSwitchItem>
                 <SettingsSwitchContent>
                   <FormLabel>{t('Password Registration')}</FormLabel>
                   <FormDescription>
-                    {t('Allow registration with password')}
+                    {t('Public password registration is disabled')}
                   </FormDescription>
                 </SettingsSwitchContent>
                 <FormControl>
-                  <Switch
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
+                  <Switch checked={false} disabled />
                 </FormControl>
               </SettingsSwitchItem>
             )}

@@ -51,6 +51,17 @@ func runSubscriptionQuotaResetOnce() {
 	defer subscriptionResetRunning.Store(false)
 
 	ctx := context.Background()
+	if common.SZUQuotaOnlyMode {
+		granted, err := model.GrantCurrentSZUMonthlyQuota()
+		if err != nil {
+			logger.LogWarn(ctx, fmt.Sprintf("monthly free quota grant failed: %v", err))
+			return
+		}
+		if common.DebugEnabled && granted > 0 {
+			logger.LogDebug(ctx, "monthly free quota granted: user_count=%d", granted)
+		}
+		return
+	}
 	totalReset := 0
 	totalExpired := 0
 	for {

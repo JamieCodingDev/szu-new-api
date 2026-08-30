@@ -14,7 +14,12 @@ import (
 )
 
 var RDB *redis.Client
-var RedisEnabled = true
+
+// Redis is unavailable until InitRedisClient has parsed the configuration and
+// completed a successful ping. Database migrations run before Redis
+// initialization, so defaulting this flag to true lets migration-time cache
+// invalidation dereference a nil client.
+var RedisEnabled = false
 
 func RedisKeyCacheSeconds() int {
 	return SyncFrequency
@@ -24,9 +29,11 @@ func RedisKeyCacheSeconds() int {
 func InitRedisClient() (err error) {
 	if os.Getenv("REDIS_CONN_STRING") == "" {
 		RedisEnabled = false
+		RDB = nil
 		SysLog("REDIS_CONN_STRING not set, Redis is not enabled")
 		return nil
 	}
+	RedisEnabled = false
 	if os.Getenv("SYNC_FREQUENCY") == "" {
 		SysLog("SYNC_FREQUENCY not set, use default value 60")
 		SyncFrequency = 60
@@ -45,7 +52,9 @@ func InitRedisClient() (err error) {
 	_, err = RDB.Ping(ctx).Result()
 	if err != nil {
 		FatalLog("Redis ping test failed: " + err.Error())
+		return err
 	}
+	RedisEnabled = true
 	if DebugEnabled {
 		SysLog(fmt.Sprintf("Redis connected to %s", opt.Addr))
 		SysLog(fmt.Sprintf("Redis database: %d", opt.DB))

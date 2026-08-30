@@ -234,7 +234,7 @@ func setupLoginAtAuthVersion(user *model.User, expectedAuthVersion int64, c *gin
 }
 
 func Register(c *gin.Context) {
-	if !common.RegisterEnabled {
+	if common.AdminProvisioningOnly || !common.RegisterEnabled {
 		common.ApiErrorI18n(c, i18n.MsgUserRegisterDisabled)
 		return
 	}
@@ -363,7 +363,11 @@ func GetAllUsers(c *gin.Context) {
 	}
 
 	pageInfo.SetTotal(int(total))
-	pageInfo.SetItems(users)
+	items := make([]map[string]interface{}, 0, len(users))
+	for _, user := range users {
+		items = append(items, buildManagedUserData(user))
+	}
+	pageInfo.SetItems(items)
 
 	common.ApiSuccess(c, pageInfo)
 	return
@@ -371,11 +375,11 @@ func GetAllUsers(c *gin.Context) {
 
 func SearchUsers(c *gin.Context) {
 	keyword := c.Query("keyword")
-	group := c.Query("group")
-	var role *int
-	if roleStr := c.Query("role"); roleStr != "" {
-		if parsed, err := strconv.Atoi(roleStr); err == nil {
-			role = &parsed
+	managedRole := strings.TrimSpace(c.Query("role"))
+	if managedRole != "" {
+		if _, ok := model.ParseManagedRole(managedRole); !ok {
+			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+			return
 		}
 	}
 	var status *int
@@ -386,14 +390,18 @@ func SearchUsers(c *gin.Context) {
 	}
 	pageInfo := common.GetPageQuery(c)
 	sortOptions := model.NewUserSortOptions(c.Query("sort_by"), c.Query("sort_order"))
-	users, total, err := model.SearchUsers(keyword, group, role, status, pageInfo.GetStartIdx(), pageInfo.GetPageSize(), sortOptions)
+	users, total, err := model.SearchUsers(keyword, "", managedRole, status, pageInfo.GetStartIdx(), pageInfo.GetPageSize(), sortOptions)
 	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
 
 	pageInfo.SetTotal(int(total))
-	pageInfo.SetItems(users)
+	items := make([]map[string]interface{}, 0, len(users))
+	for _, user := range users {
+		items = append(items, buildManagedUserData(user))
+	}
+	pageInfo.SetItems(items)
 	common.ApiSuccess(c, pageInfo)
 	return
 }
@@ -422,9 +430,40 @@ func GetUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
-		"data":    user,
+		"data":    buildManagedUserData(user),
 	})
 	return
+}
+
+// buildManagedUserData is the administrator-facing user DTO. SZU user
+// management has no group or invitation concepts, and credentials must never
+// be returned by a list or detail endpoint.
+func buildManagedUserData(user *model.User) map[string]interface{} {
+	data := map[string]interface{}{
+		"id":                user.Id,
+		"username":          user.Username,
+		"display_name":      user.DisplayName,
+		"role":              user.Role,
+		"account_type":      model.NormalizeAccountType(user.AccountType),
+		"managed_role":      model.ManagedRoleForUser(user),
+		"status":            user.Status,
+		"email":             user.Email,
+		"github_id":         user.GitHubId,
+		"discord_id":        user.DiscordId,
+		"oidc_id":           user.OidcId,
+		"wechat_id":         user.WeChatId,
+		"telegram_id":       user.TelegramId,
+		"linux_do_id":       user.LinuxDOId,
+		"quota":             user.Quota,
+		"used_quota":        user.UsedQuota,
+		"request_count":     user.RequestCount,
+		"created_at":        user.CreatedAt,
+		"last_login_at":     user.LastLoginAt,
+		"DeletedAt":         user.DeletedAt,
+		"remark":            user.Remark,
+		"admin_permissions": user.AdminPermissions,
+	}
+	return data
 }
 
 func GenerateAccessToken(c *gin.Context) {
@@ -540,31 +579,26 @@ func buildSelfUserData(user *model.User) map[string]interface{} {
 	permissions := calculateUserPermissions(user.Role)
 	permissions["admin_permissions"] = authz.Capabilities(user.Id, user.Role)
 	return map[string]interface{}{
-		"id":                user.Id,
-		"username":          user.Username,
-		"display_name":      user.DisplayName,
-		"role":              user.Role,
-		"status":            user.Status,
-		"email":             user.Email,
-		"github_id":         user.GitHubId,
-		"discord_id":        user.DiscordId,
-		"oidc_id":           user.OidcId,
-		"wechat_id":         user.WeChatId,
-		"telegram_id":       user.TelegramId,
-		"group":             user.Group,
-		"quota":             user.Quota,
-		"used_quota":        user.UsedQuota,
-		"request_count":     user.RequestCount,
-		"aff_code":          user.AffCode,
-		"aff_count":         user.AffCount,
-		"aff_quota":         user.AffQuota,
-		"aff_history_quota": user.AffHistoryQuota,
-		"inviter_id":        user.InviterId,
-		"linux_do_id":       user.LinuxDOId,
-		"setting":           user.Setting,
-		"stripe_customer":   user.StripeCustomer,
-		"sidebar_modules":   userSetting.SidebarModules, // 正确提取sidebar_modules字段
-		"permissions":       permissions,
+		"id":              user.Id,
+		"username":        user.Username,
+		"display_name":    user.DisplayName,
+		"role":            user.Role,
+		"status":          user.Status,
+		"email":           user.Email,
+		"github_id":       user.GitHubId,
+		"discord_id":      user.DiscordId,
+		"oidc_id":         user.OidcId,
+		"wechat_id":       user.WeChatId,
+		"telegram_id":     user.TelegramId,
+		"group":           user.Group,
+		"quota":           user.Quota,
+		"used_quota":      user.UsedQuota,
+		"request_count":   user.RequestCount,
+		"linux_do_id":     user.LinuxDOId,
+		"setting":         user.Setting,
+		"stripe_customer": user.StripeCustomer,
+		"sidebar_modules": userSetting.SidebarModules, // 正确提取sidebar_modules字段
+		"permissions":     permissions,
 	}
 }
 
@@ -699,8 +733,23 @@ func UpdateUser(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
-	updatedUser.Username = strings.TrimSpace(updatedUser.Username)
-	if updatedUser.Username == "" {
+	originUser, err := model.GetUserById(updatedUser.Id, false)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if updatedUser.ManagedRole == "" {
+		updatedUser.ManagedRole = model.ManagedRoleForUser(originUser)
+	}
+	if err := model.ApplyManagedRole(&updatedUser, updatedUser.ManagedRole); err != nil {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	if originUser.Role == common.RoleRootUser {
+		updatedUser.Role = common.RoleRootUser
+		updatedUser.AccountType = model.AccountTypeTeacher
+	}
+	if err := model.NormalizeManagedUserIdentity(&updatedUser); err != nil {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
@@ -711,18 +760,13 @@ func UpdateUser(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgUserInputInvalid, map[string]any{"Error": err.Error()})
 		return
 	}
-	originUser, err := model.GetUserById(updatedUser.Id, false)
-	if err != nil {
-		common.ApiError(c, err)
-		return
-	}
-	if updatedUser.Role != common.RoleGuestUser && updatedUser.Role != originUser.Role {
-		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
-		return
-	}
-	updatedUser.Role = originUser.Role
+	updatedUser.Group = "default"
 	myRole := c.GetInt("role")
 	if !canManageTargetRole(myRole, originUser.Role) {
+		common.ApiErrorI18n(c, i18n.MsgUserNoPermissionHigherLevel)
+		return
+	}
+	if !canManageTargetRole(myRole, updatedUser.Role) {
 		common.ApiErrorI18n(c, i18n.MsgUserNoPermissionHigherLevel)
 		return
 	}
@@ -735,7 +779,10 @@ func UpdateUser(c *gin.Context) {
 		if err := updatedUser.EditWithTx(tx, updatePassword); err != nil {
 			return err
 		}
-		touched, err := updateAdminPermissionsForUserInTx(c, tx, updatedUser.Id, originUser.Role, updatedUser.AdminPermissions)
+		if err := model.SyncSZUEducationSubscriptionForUserWithTx(tx, &updatedUser); err != nil {
+			return err
+		}
+		touched, err := updateAdminPermissionsForUserInTx(c, tx, updatedUser.Id, updatedUser.Role, updatedUser.AdminPermissions)
 		authzTouched = touched
 		return err
 	}); err != nil {
@@ -1033,17 +1080,24 @@ func DeleteSelf(c *gin.Context) {
 func CreateUser(c *gin.Context) {
 	var user model.User
 	err := common.DecodeJson(c.Request.Body, &user)
-	user.Username = strings.TrimSpace(user.Username)
-	if err != nil || user.Username == "" || user.Password == "" {
+	if err != nil || user.Password == "" {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	if user.ManagedRole == "" {
+		user.ManagedRole = model.ManagedRoleStudent
+	}
+	if err := model.ApplyManagedRole(&user, user.ManagedRole); err != nil {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	if err := model.NormalizeManagedUserIdentity(&user); err != nil {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
 	if err := common.Validate.Struct(&user); err != nil {
 		common.ApiErrorI18n(c, i18n.MsgUserInputInvalid, map[string]any{"Error": err.Error()})
 		return
-	}
-	if user.DisplayName == "" {
-		user.DisplayName = user.Username
 	}
 	myRole := c.GetInt("role")
 	if user.Role >= myRole {
@@ -1054,12 +1108,19 @@ func CreateUser(c *gin.Context) {
 	cleanUser := model.User{
 		Username:    user.Username,
 		Password:    user.Password,
-		DisplayName: user.DisplayName,
+		DisplayName: user.Username,
+		Email:       user.Email,
 		Role:        user.Role, // 保持管理员设置的角色
+		AccountType: user.AccountType,
+		ManagedRole: user.ManagedRole,
+		Group:       "default",
 	}
 	authzTouched := false
 	if err := model.DB.Transaction(func(tx *gorm.DB) error {
 		if err := cleanUser.InsertWithTx(tx, 0); err != nil {
+			return err
+		}
+		if err := model.SyncSZUEducationSubscriptionForUserWithTx(tx, &cleanUser); err != nil {
 			return err
 		}
 		touched, err := updateAdminPermissionsForUserInTx(c, tx, cleanUser.Id, cleanUser.Role, user.AdminPermissions)
@@ -1180,6 +1241,7 @@ func ManageUser(c *gin.Context) {
 			return
 		}
 		user.Role = common.RoleAdminUser
+		user.AccountType = model.AccountTypeTeacher
 	case "demote":
 		if user.Role == common.RoleRootUser {
 			common.ApiErrorI18n(c, i18n.MsgUserCannotDemoteRootUser)
@@ -1190,7 +1252,12 @@ func ManageUser(c *gin.Context) {
 			return
 		}
 		user.Role = common.RoleCommonUser
+		user.AccountType = model.AccountTypeTeacher
 	case "add_quota":
+		if common.SZUQuotaOnlyMode {
+			common.ApiErrorMsg(c, "quota can only be granted monthly or through redemption codes")
+			return
+		}
 		switch req.Mode {
 		case "add":
 			if req.Value <= 0 {
@@ -1253,6 +1320,9 @@ func ManageUser(c *gin.Context) {
 			if err := user.UpdateWithTx(tx, false); err != nil {
 				return err
 			}
+			if err := model.SyncSZUEducationSubscriptionForUserWithTx(tx, &user); err != nil {
+				return err
+			}
 			return authz.ClearUserAuthorizationInTx(tx, user.Id)
 		}); err != nil {
 			common.ApiError(c, err)
@@ -1274,6 +1344,12 @@ func ManageUser(c *gin.Context) {
 		if err := user.Update(false); err != nil {
 			common.ApiError(c, err)
 			return
+		}
+		if req.Action == "promote" {
+			if err := model.SyncSZUEducationSubscriptionForUser(user.Id); err != nil {
+				common.ApiError(c, err)
+				return
+			}
 		}
 	}
 	// Update/UpdateWithTx has already published the new user hash and revoked
@@ -1391,7 +1467,7 @@ func getTopUpLock(userID int) *topUpTryLock {
 }
 
 func TopUp(c *gin.Context) {
-	if !operation_setting.IsPaymentComplianceConfirmed() {
+	if !common.SZUQuotaOnlyMode && !operation_setting.IsPaymentComplianceConfirmed() {
 		common.ApiErrorI18n(c, i18n.MsgPaymentComplianceRequired)
 		return
 	}

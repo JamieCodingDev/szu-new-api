@@ -70,6 +70,16 @@ var TelegramOAuthEnabled = false
 var TurnstileCheckEnabled = false
 var RegisterEnabled = true
 
+// AdminProvisioningOnly is enabled by the SZU deployment. Public password,
+// OAuth and WeChat registration stay disabled even if a legacy option still
+// contains RegisterEnabled=true; accounts are provisioned by administrators.
+const AdminProvisioningOnly = true
+
+// SZUQuotaOnlyMode removes every legacy money, invitation, check-in and
+// manual quota-grant path. Quota can only come from the monthly system plan
+// or a redeemed code.
+const SZUQuotaOnlyMode = true
+
 var EmailDomainRestrictionEnabled = false // 是否启用邮箱域名限制
 var EmailAliasRestrictionEnabled = false  // 是否启用邮箱别名限制
 var EmailDomainWhitelist = []string{

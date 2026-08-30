@@ -284,6 +284,18 @@ func AddToken(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgTokenNameTooLong)
 		return
 	}
+	// API keys are credentials only. Every key shares the account wallet and
+	// cannot carry quota, group, expiry, model, or IP restrictions.
+	token.ExpiredTime = -1
+	token.RemainQuota = 0
+	token.UnlimitedQuota = true
+	token.ModelLimitsEnabled = false
+	token.ModelLimits = ""
+	emptyAllowIps := ""
+	token.AllowIps = &emptyAllowIps
+	token.Group = "default"
+	token.CrossGroupRetry = false
+	_ = token.SetAutoGroups(nil)
 	// 非无限额度时，检查额度值是否超出有效范围
 	if !token.UnlimitedQuota {
 		if token.RemainQuota < 0 {
@@ -379,6 +391,16 @@ func UpdateToken(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgTokenNameTooLong)
 		return
 	}
+	token.ExpiredTime = -1
+	token.RemainQuota = 0
+	token.UnlimitedQuota = true
+	token.ModelLimitsEnabled = false
+	token.ModelLimits = ""
+	emptyAllowIps := ""
+	token.AllowIps = &emptyAllowIps
+	token.Group = "default"
+	token.CrossGroupRetry = false
+	_ = token.SetAutoGroups(nil)
 	if !token.UnlimitedQuota {
 		if token.RemainQuota < 0 {
 			common.ApiErrorI18n(c, i18n.MsgTokenQuotaNegative)
@@ -395,6 +417,16 @@ func UpdateToken(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	// Status-only updates also normalize legacy restricted keys.
+	cleanToken.ExpiredTime = -1
+	cleanToken.RemainQuota = 0
+	cleanToken.UnlimitedQuota = true
+	cleanToken.ModelLimitsEnabled = false
+	cleanToken.ModelLimits = ""
+	cleanToken.AllowIps = &emptyAllowIps
+	cleanToken.Group = "default"
+	cleanToken.CrossGroupRetry = false
+	_ = cleanToken.SetAutoGroups(nil)
 	if token.Status == common.TokenStatusEnabled {
 		if cleanToken.Status == common.TokenStatusExpired && cleanToken.ExpiredTime <= common.GetTimestamp() && cleanToken.ExpiredTime != -1 {
 			common.ApiErrorI18n(c, i18n.MsgTokenExpiredCannotEnable)

@@ -70,9 +70,16 @@ func createRootAccountIfNeed() error {
 			Status:      common.UserStatusEnabled,
 			DisplayName: "Root User",
 			AccessToken: nil,
-			Quota:       100000000,
+			Quota:       0,
 		}
-		DB.Create(&rootUser)
+		if err := DB.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Create(&rootUser).Error; err != nil {
+				return err
+			}
+			return EnsureSZUMonthlyQuotaForUserWithTx(tx, &rootUser)
+		}); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -334,6 +341,7 @@ func migrateDB() error {
 		&Checkin{},
 		&SubscriptionOrder{},
 		&UserSubscription{},
+		&SZUMonthlyQuotaGrant{},
 		&SubscriptionPreConsumeRecord{},
 		&CustomOAuthProvider{},
 		&UserOAuthBinding{},
@@ -361,6 +369,9 @@ func migrateDB() error {
 		if err := DB.AutoMigrate(&SubscriptionPlan{}); err != nil {
 			return err
 		}
+	}
+	if err := EnsureSZUMonthlyQuotaGrants(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -398,6 +409,7 @@ func migrateDBFast() error {
 		{&Checkin{}, "Checkin"},
 		{&SubscriptionOrder{}, "SubscriptionOrder"},
 		{&UserSubscription{}, "UserSubscription"},
+		{&SZUMonthlyQuotaGrant{}, "SZUMonthlyQuotaGrant"},
 		{&SubscriptionPreConsumeRecord{}, "SubscriptionPreConsumeRecord"},
 		{&CustomOAuthProvider{}, "CustomOAuthProvider"},
 		{&UserOAuthBinding{}, "UserOAuthBinding"},
@@ -443,6 +455,9 @@ func migrateDBFast() error {
 		if err := DB.AutoMigrate(&SubscriptionPlan{}); err != nil {
 			return err
 		}
+	}
+	if err := EnsureSZUMonthlyQuotaGrants(); err != nil {
+		return err
 	}
 	common.SysLog("database migrated")
 	return nil

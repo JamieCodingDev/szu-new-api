@@ -54,14 +54,13 @@ export async function getUsers(
 }
 
 /**
- * Search users by keyword or group
+ * Search users by keyword, role, or status
  */
 export async function searchUsers(
   params: SearchUsersParams
 ): Promise<GetUsersResponse> {
   const {
     keyword = '',
-    group = '',
     role = '',
     status = '',
     p = 1,
@@ -71,7 +70,6 @@ export async function searchUsers(
   } = params
   const queryParams = new URLSearchParams()
   queryParams.set('keyword', keyword)
-  queryParams.set('group', group)
   if (role) queryParams.set('role', role)
   if (status) queryParams.set('status', status)
   queryParams.set('p', String(p))
@@ -156,7 +154,8 @@ export async function resetUserTwoFA(id: number): Promise<ApiResponse> {
 }
 
 /**
- * Get all available groups
+ * Get routing groups for channel administration. User accounts and API keys
+ * do not expose a configurable group in SZU quota-only mode.
  */
 export async function getGroups(): Promise<ApiResponse<string[]>> {
   const res = await api.get('/api/group/')
