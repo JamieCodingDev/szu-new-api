@@ -1,0 +1,128 @@
+package model
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/url"
+	"os"
+	"strings"
+
+	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
+	"gorm.io/gorm"
+)
+
+const (
+	SZUDeepSeekChannelName    = "SZU DeepSeek V4 Flash"
+	SZUDeepSeekPublicModel    = "deepseek-v4-flash"
+	defaultSZUDeepSeekBaseURL = "http://deepseek-infer.incus:11434"
+	defaultSZUDeepSeekModel   = "deepseek-v4-flash:latest"
+	defaultSZUDeepSeekAPIKey  = "local"
+	defaultSZUDeepSeekGroup   = "default"
+)
+
+type szuDeepSeekChannelConfig struct {
+	BaseURL       string
+	UpstreamModel string
+	APIKey        string
+}
+
+func loadSZUDeepSeekChannelConfig() (szuDeepSeekChannelConfig, error) {
+	config := szuDeepSeekChannelConfig{
+		BaseURL:       strings.TrimRight(strings.TrimSpace(os.Getenv("SZU_DEEPSEEK_BASE_URL")), "/"),
+		UpstreamModel: strings.TrimSpace(os.Getenv("SZU_DEEPSEEK_UPSTREAM_MODEL")),
+		APIKey:        strings.TrimSpace(os.Getenv("SZU_DEEPSEEK_API_KEY")),
+	}
+	if config.BaseURL == "" {
+		config.BaseURL = defaultSZUDeepSeekBaseURL
+	}
+	if config.UpstreamModel == "" {
+		config.UpstreamModel = defaultSZUDeepSeekModel
+	}
+	if config.APIKey == "" {
+		config.APIKey = defaultSZUDeepSeekAPIKey
+	}
+
+	parsedURL, err := url.Parse(config.BaseURL)
+	if err != nil || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") || parsedURL.Host == "" {
+		return szuDeepSeekChannelConfig{}, fmt.Errorf("invalid SZU_DEEPSEEK_BASE_URL %q", config.BaseURL)
+	}
+	if strings.Contains(config.UpstreamModel, ",") {
+		return szuDeepSeekChannelConfig{}, errors.New("SZU_DEEPSEEK_UPSTREAM_MODEL must contain exactly one model")
+	}
+	return config, nil
+}
+
+// EnsureSZUDeepSeekChannel creates the built-in SZU Ollama channel and repairs
+// its routing ability on every master-node startup. It intentionally leaves
+// channels created by administrators untouched.
+func EnsureSZUDeepSeekChannel() error {
+	if DB == nil {
+		return errors.New("database is not initialized")
+	}
+
+	config, err := loadSZUDeepSeekChannelConfig()
+	if err != nil {
+		return err
+	}
+	modelMapping, err := json.Marshal(map[string]string{
+		SZUDeepSeekPublicModel: config.UpstreamModel,
+	})
+	if err != nil {
+		return fmt.Errorf("marshal SZU DeepSeek model mapping: %w", err)
+	}
+	mapping := string(modelMapping)
+
+	return DB.Transaction(func(tx *gorm.DB) error {
+		var channel Channel
+		query := tx.Where("name = ?", SZUDeepSeekChannelName).Order("id ASC").Limit(1).Find(&channel)
+		if query.Error != nil {
+			return fmt.Errorf("query SZU DeepSeek channel: %w", query.Error)
+		}
+
+		if query.RowsAffected == 0 {
+			channel = Channel{
+				Type:         constant.ChannelTypeOllama,
+				Key:          config.APIKey,
+				Status:       common.ChannelStatusEnabled,
+				Name:         SZUDeepSeekChannelName,
+				CreatedTime:  common.GetTimestamp(),
+				BaseURL:      &config.BaseURL,
+				Models:       SZUDeepSeekPublicModel,
+				Group:        defaultSZUDeepSeekGroup,
+				ModelMapping: &mapping,
+			}
+			if err := tx.Create(&channel).Error; err != nil {
+				return fmt.Errorf("create SZU DeepSeek channel: %w", err)
+			}
+			if err := channel.AddAbilities(tx); err != nil {
+				return fmt.Errorf("create SZU DeepSeek ability: %w", err)
+			}
+			return nil
+		}
+
+		channel.Type = constant.ChannelTypeOllama
+		channel.Key = config.APIKey
+		channel.Status = common.ChannelStatusEnabled
+		channel.BaseURL = &config.BaseURL
+		channel.Models = SZUDeepSeekPublicModel
+		channel.Group = defaultSZUDeepSeekGroup
+		channel.ModelMapping = &mapping
+		if err := tx.Model(&channel).Select(
+			"type",
+			"key",
+			"status",
+			"base_url",
+			"models",
+			"group",
+			"model_mapping",
+		).Updates(&channel).Error; err != nil {
+			return fmt.Errorf("repair SZU DeepSeek channel: %w", err)
+		}
+		if err := channel.UpdateAbilities(tx); err != nil {
+			return fmt.Errorf("repair SZU DeepSeek ability: %w", err)
+		}
+		return nil
+	})
+}

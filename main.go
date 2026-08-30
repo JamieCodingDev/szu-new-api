@@ -314,6 +314,12 @@ func InitResources() error {
 		common.FatalLog("failed to initialize database: " + err.Error())
 		return err
 	}
+	if common.IsMasterNode {
+		if err = model.EnsureSZUDeepSeekChannel(); err != nil {
+			common.FatalLog("failed to initialize SZU DeepSeek channel: " + err.Error())
+			return err
+		}
+	}
 	if err = authz.Init(model.DB); err != nil {
 		common.FatalLog("failed to initialize authorization: " + err.Error())
 		return err
