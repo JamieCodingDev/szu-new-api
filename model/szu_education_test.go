@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
+	gormtests "gorm.io/gorm/utils/tests"
 )
 
 func TestSZUMonthlyQuotaAccumulatesAndNeverResets(t *testing.T) {
@@ -278,6 +279,20 @@ func TestSZUMonthlyQuotaDefaultsAreDatabaseBacked(t *testing.T) {
 	common.OptionMapRWMutex.Unlock()
 	require.NoError(t, loadSZUMonthlyQuotaDefaultsFromDatabase())
 	assert.Equal(t, custom, GetSZUMonthlyQuotaDefaults())
+}
+
+func TestSZUMonthlyQuotaOptionQueryQuotesReservedKeyColumn(t *testing.T) {
+	dryRunDB, err := gorm.Open(gormtests.DummyDialector{}, &gorm.Config{DryRun: true})
+	require.NoError(t, err)
+	var options []Option
+	statement := querySZUMonthlyQuotaOptions(
+		dryRunDB,
+		&options,
+		[]string{SZUStudentMonthlyQuotaOptionKey},
+	).Statement
+
+	assert.Contains(t, statement.SQL.String(), "`key`")
+	assert.NotContains(t, statement.SQL.String(), " WHERE key ")
 }
 
 func TestSZUMonthlyQuotaDefaultsValidation(t *testing.T) {

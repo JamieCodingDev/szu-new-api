@@ -100,7 +100,7 @@ func loadSZUMonthlyQuotaDefaultsFromDatabase() error {
 		SZUAdminMonthlyQuotaOptionKey,
 	}
 	var options []Option
-	if err := DB.Where("key IN ?", keys).Find(&options).Error; err != nil {
+	if err := querySZUMonthlyQuotaOptions(DB, &options, keys).Error; err != nil {
 		return err
 	}
 	common.OptionMapRWMutex.Lock()
@@ -112,6 +112,12 @@ func loadSZUMonthlyQuotaDefaultsFromDatabase() error {
 		common.OptionMap[option.Key] = option.Value
 	}
 	return nil
+}
+
+func querySZUMonthlyQuotaOptions(db *gorm.DB, options *[]Option, keys []string) *gorm.DB {
+	// A map condition makes GORM quote the reserved `key` column using the
+	// active database dialect (MySQL/PostgreSQL/SQLite).
+	return db.Where(map[string]interface{}{"key": keys}).Find(options)
 }
 
 // GetSZUMonthlyQuotaDefaults returns the current database-backed role policy,
