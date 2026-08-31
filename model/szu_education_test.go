@@ -226,6 +226,130 @@ func TestManagedRoleMappingKeepsAuthorizationAndAccountTypeConsistent(t *testing
 	}
 }
 
+func TestSZUMonthlyQuotaDefaultsAreDatabaseBacked(t *testing.T) {
+	custom := SZUMonthlyQuotaDefaults{
+		Student: 150_000,
+		Teacher: 300_000,
+		Admin:   1_500_000,
+	}
+	keys := []string{
+		SZUStudentMonthlyQuotaOptionKey,
+		SZUTeacherMonthlyQuotaOptionKey,
+		SZUAdminMonthlyQuotaOptionKey,
+	}
+
+	common.OptionMapRWMutex.Lock()
+	if common.OptionMap == nil {
+		common.OptionMap = map[string]string{}
+	}
+	previous := make(map[string]string, len(keys))
+	present := make(map[string]bool, len(keys))
+	for _, key := range keys {
+		previous[key], present[key] = common.OptionMap[key]
+	}
+	common.OptionMapRWMutex.Unlock()
+	t.Cleanup(func() {
+		_ = DB.Where("key IN ?", keys).Delete(&Option{}).Error
+		common.OptionMapRWMutex.Lock()
+		defer common.OptionMapRWMutex.Unlock()
+		for _, key := range keys {
+			if present[key] {
+				common.OptionMap[key] = previous[key]
+			} else {
+				delete(common.OptionMap, key)
+			}
+		}
+	})
+
+	require.NoError(t, UpdateSZUMonthlyQuotaDefaults(custom))
+	assert.Equal(t, custom, GetSZUMonthlyQuotaDefaults())
+	assert.Equal(t, custom.Student, SZUMonthlyQuotaForUser(&User{Role: common.RoleCommonUser, AccountType: AccountTypeStudent}))
+	assert.Equal(t, custom.Teacher, SZUMonthlyQuotaForUser(&User{Role: common.RoleCommonUser, AccountType: AccountTypeTeacher}))
+	assert.Equal(t, custom.Admin, SZUMonthlyQuotaForUser(&User{Role: common.RoleAdminUser}))
+
+	var stored []Option
+	require.NoError(t, DB.Where("key IN ?", keys).Find(&stored).Error)
+	assert.Len(t, stored, 3)
+
+	common.OptionMapRWMutex.Lock()
+	for _, key := range keys {
+		delete(common.OptionMap, key)
+	}
+	common.OptionMapRWMutex.Unlock()
+	require.NoError(t, loadSZUMonthlyQuotaDefaultsFromDatabase())
+	assert.Equal(t, custom, GetSZUMonthlyQuotaDefaults())
+}
+
+func TestSZUMonthlyQuotaDefaultsValidation(t *testing.T) {
+	assert.Error(t, ValidateSZUMonthlyQuotaDefaults(SZUMonthlyQuotaDefaults{
+		Student: 0,
+		Teacher: SZUTeacherMonthlyQuota,
+		Admin:   SZUAdminMonthlyQuota,
+	}))
+	assert.Error(t, ValidateSZUMonthlyQuotaDefaults(SZUMonthlyQuotaDefaults{
+		Student: SZUStudentMonthlyQuota,
+		Teacher: common.MaxWalletQuota + 1,
+		Admin:   SZUAdminMonthlyQuota,
+	}))
+}
+
+func TestSZUMonthlyQuotaSettingIncreaseTopsUpWithoutClawback(t *testing.T) {
+	truncateTables(t)
+	common.OptionMapRWMutex.Lock()
+	if common.OptionMap == nil {
+		common.OptionMap = map[string]string{}
+	}
+	previous, wasPresent := common.OptionMap[SZUStudentMonthlyQuotaOptionKey]
+	common.OptionMap[SZUStudentMonthlyQuotaOptionKey] = "100000"
+	common.OptionMapRWMutex.Unlock()
+	t.Cleanup(func() {
+		common.OptionMapRWMutex.Lock()
+		defer common.OptionMapRWMutex.Unlock()
+		if wasPresent {
+			common.OptionMap[SZUStudentMonthlyQuotaOptionKey] = previous
+		} else {
+			delete(common.OptionMap, SZUStudentMonthlyQuotaOptionKey)
+		}
+	})
+
+	user := User{
+		Username:    "global-quota-change-user",
+		Password:    "password",
+		AffCode:     "global-quota-change-aff",
+		Status:      common.UserStatusEnabled,
+		Role:        common.RoleCommonUser,
+		AccountType: AccountTypeStudent,
+	}
+	require.NoError(t, DB.Create(&user).Error)
+	grantAt := time.Date(2026, time.September, 1, 0, 0, 0, 0, szuQuotaLocation).Unix()
+	credit := func() int {
+		creditedQuota := 0
+		require.NoError(t, DB.Transaction(func(tx *gorm.DB) error {
+			var err error
+			creditedQuota, err = grantSZUMonthlyQuotaForUserWithTx(tx, user.Id, grantAt)
+			return err
+		}))
+		return creditedQuota
+	}
+
+	assert.Equal(t, 100_000, credit())
+	common.OptionMapRWMutex.Lock()
+	common.OptionMap[SZUStudentMonthlyQuotaOptionKey] = "150000"
+	common.OptionMapRWMutex.Unlock()
+	assert.Equal(t, 50_000, credit())
+
+	common.OptionMapRWMutex.Lock()
+	common.OptionMap[SZUStudentMonthlyQuotaOptionKey] = "50000"
+	common.OptionMapRWMutex.Unlock()
+	assert.Zero(t, credit())
+
+	require.NoError(t, DB.First(&user, user.Id).Error)
+	assert.Equal(t, 150_000, user.Quota)
+	var grant SZUMonthlyQuotaGrant
+	require.NoError(t, DB.Where("user_id = ? AND grant_month = ?", user.Id, "2026-09").First(&grant).Error)
+	assert.Equal(t, 150_000, grant.Amount)
+}
+
 func TestSZUMonthlyQuotaPromotionsTopUpCurrentMonthWithoutClawback(t *testing.T) {
 	truncateTables(t)
 	user := User{

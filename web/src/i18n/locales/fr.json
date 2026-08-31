@@ -5634,6 +5634,18 @@
     "If setup fails, verify the service URL, API key, and model ID first. A successful GET /v1/models response confirms that the address and key are valid.": "En cas d'échec, vérifiez d'abord l'URL, la clé API et l'ID du modèle. Une réponse GET /v1/models réussie confirme l'URL et la clé.",
     "Request URL": "URL de requête",
     "API format": "Format d’API",
-    "Authentication field": "Champ d’authentification"
+    "Authentication field": "Champ d’authentification",
+    "Monthly Quota Settings": "Paramètres des quotas mensuels",
+    "Configure the monthly free quota granted to each role.": "Configurez le quota gratuit attribué chaque mois à chaque rôle.",
+    "Student Monthly Quota": "Quota mensuel étudiant",
+    "Teacher Monthly Quota": "Quota mensuel enseignant",
+    "Administrator Monthly Quota": "Quota mensuel administrateur",
+    "Each monthly quota must be a positive whole number": "Chaque quota mensuel doit être un nombre entier positif",
+    "Failed to update monthly quotas": "Échec de la mise à jour des quotas mensuels",
+    "Monthly quota defaults updated": "Les quotas mensuels par défaut ont été mis à jour",
+    "Failed to load monthly quota settings": "Échec du chargement des paramètres de quotas mensuels",
+    "quota points": "points de quota",
+    "Changes apply to monthly grants for all users. Increasing a value tops up only the current month's difference; decreasing it never deducts quota already granted.": "Les modifications s’appliquent aux attributions mensuelles de tous les utilisateurs. Une augmentation ajoute uniquement la différence du mois en cours ; une diminution ne retire jamais un quota déjà attribué.",
+    "Current monthly free quota": "Quota mensuel gratuit actuel"
   }
 }

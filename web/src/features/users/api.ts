@@ -28,8 +28,13 @@ import type {
   UserFormData,
   ManageUserAction,
   ManageUserQuotaPayload,
+  MonthlyQuotaDefaults,
   ApiResponse,
 } from './types'
+
+export const MONTHLY_QUOTA_DEFAULTS_QUERY_KEY = [
+  'szu-monthly-quota-defaults',
+] as const
 
 // ============================================================================
 // User Management APIs
@@ -172,6 +177,25 @@ export async function getPermissionCatalog(): Promise<PermissionCatalog> {
     resources: res.data?.data?.resources ?? [],
     roles: res.data?.data?.roles ?? [],
   }
+}
+
+/** Get the global role-based monthly free quota policy. */
+export async function getMonthlyQuotaDefaults(): Promise<MonthlyQuotaDefaults> {
+  const res = await api.get('/api/user/monthly-quota-defaults')
+  if (!res.data?.success || !res.data?.data) {
+    throw new Error(
+      res.data?.message || 'Failed to load monthly quota settings'
+    )
+  }
+  return res.data.data
+}
+
+/** Atomically update all role-based monthly free quota defaults. */
+export async function updateMonthlyQuotaDefaults(
+  defaults: MonthlyQuotaDefaults
+): Promise<ApiResponse<MonthlyQuotaDefaults>> {
+  const res = await api.put('/api/user/monthly-quota-defaults', defaults)
+  return res.data
 }
 
 // ============================================================================

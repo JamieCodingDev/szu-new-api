@@ -5634,6 +5634,18 @@
     "If setup fails, verify the service URL, API key, and model ID first. A successful GET /v1/models response confirms that the address and key are valid.": "Если настройка не работает, сначала проверьте URL сервиса, API-ключ и ID модели. Успешный GET /v1/models подтверждает URL и ключ.",
     "Request URL": "URL запроса",
     "API format": "Формат API",
-    "Authentication field": "Поле аутентификации"
+    "Authentication field": "Поле аутентификации",
+    "Monthly Quota Settings": "Настройки месячных квот",
+    "Configure the monthly free quota granted to each role.": "Настройте бесплатную месячную квоту для каждой роли.",
+    "Student Monthly Quota": "Месячная квота студента",
+    "Teacher Monthly Quota": "Месячная квота преподавателя",
+    "Administrator Monthly Quota": "Месячная квота администратора",
+    "Each monthly quota must be a positive whole number": "Каждая месячная квота должна быть положительным целым числом",
+    "Failed to update monthly quotas": "Не удалось обновить месячные квоты",
+    "Monthly quota defaults updated": "Месячные квоты по умолчанию обновлены",
+    "Failed to load monthly quota settings": "Не удалось загрузить настройки месячных квот",
+    "quota points": "единиц квоты",
+    "Changes apply to monthly grants for all users. Increasing a value tops up only the current month's difference; decreasing it never deducts quota already granted.": "Изменения применяются к месячным начислениям всех пользователей. При увеличении начисляется только разница за текущий месяц; уменьшение не списывает уже начисленную квоту.",
+    "Current monthly free quota": "Текущая бесплатная месячная квота"
   }
 }

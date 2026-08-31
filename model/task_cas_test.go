@@ -56,6 +56,7 @@ func TestMain(m *testing.M) {
 		&SubscriptionOrder{},
 		&UserSubscription{},
 		&SZUMonthlyQuotaGrant{},
+		&Option{},
 		&UserOAuthBinding{},
 		&PerfMetric{},
 		&SystemInstance{},

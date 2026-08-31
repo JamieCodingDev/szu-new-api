@@ -370,6 +370,9 @@ func migrateDB() error {
 			return err
 		}
 	}
+	if err := loadSZUMonthlyQuotaDefaultsFromDatabase(); err != nil {
+		return err
+	}
 	if err := EnsureSZUMonthlyQuotaGrants(); err != nil {
 		return err
 	}
@@ -455,6 +458,9 @@ func migrateDBFast() error {
 		if err := DB.AutoMigrate(&SubscriptionPlan{}); err != nil {
 			return err
 		}
+	}
+	if err := loadSZUMonthlyQuotaDefaultsFromDatabase(); err != nil {
+		return err
 	}
 	if err := EnsureSZUMonthlyQuotaGrants(); err != nil {
 		return err

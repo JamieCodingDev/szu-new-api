@@ -34,6 +34,7 @@ func setupManageUserTestDB(t *testing.T) *gorm.DB {
 	require.NoError(t, db.AutoMigrate(
 		&model.User{}, &model.UserSession{}, &model.Log{}, &model.CasbinRule{}, &model.AuthzRole{},
 		&model.SubscriptionPlan{}, &model.UserSubscription{}, &model.SZUMonthlyQuotaGrant{},
+		&model.Option{},
 	))
 
 	t.Cleanup(func() {
@@ -46,6 +47,58 @@ func setupManageUserTestDB(t *testing.T) *gorm.DB {
 		}
 	})
 	return db
+}
+
+func performMonthlyQuotaDefaultsRequest(t *testing.T, method string, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(method, "/api/user/monthly-quota-defaults", strings.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("id", 9999)
+	c.Set("role", common.RoleRootUser)
+	c.Set("username", "root-operator")
+	if method == http.MethodGet {
+		GetSZUMonthlyQuotaDefaults(c)
+	} else {
+		UpdateSZUMonthlyQuotaDefaults(c)
+	}
+	return recorder
+}
+
+func TestMonthlyQuotaDefaultsManagement(t *testing.T) {
+	db := setupManageUserTestDB(t)
+	previousOptionMap := common.OptionMap
+	common.OptionMapRWMutex.Lock()
+	common.OptionMap = map[string]string{
+		model.SZUStudentMonthlyQuotaOptionKey: fmt.Sprint(model.SZUStudentMonthlyQuota),
+		model.SZUTeacherMonthlyQuotaOptionKey: fmt.Sprint(model.SZUTeacherMonthlyQuota),
+		model.SZUAdminMonthlyQuotaOptionKey:   fmt.Sprint(model.SZUAdminMonthlyQuota),
+	}
+	common.OptionMapRWMutex.Unlock()
+	t.Cleanup(func() {
+		common.OptionMapRWMutex.Lock()
+		common.OptionMap = previousOptionMap
+		common.OptionMapRWMutex.Unlock()
+	})
+
+	recorder := performMonthlyQuotaDefaultsRequest(t, http.MethodPut, `{"student":150000,"teacher":300000,"admin":1500000}`)
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), `"success":true`)
+	assert.Contains(t, recorder.Body.String(), `"student":150000`)
+	assert.Equal(t, 150_000, model.SZUMonthlyQuotaForUser(&model.User{Role: common.RoleCommonUser, AccountType: model.AccountTypeStudent}))
+
+	var options []model.Option
+	require.NoError(t, db.Order("key").Find(&options).Error)
+	assert.Len(t, options, 3)
+
+	recorder = performMonthlyQuotaDefaultsRequest(t, http.MethodGet, "")
+	assert.Contains(t, recorder.Body.String(), `"teacher":300000`)
+
+	recorder = performMonthlyQuotaDefaultsRequest(t, http.MethodPut, `{"student":0,"teacher":300000,"admin":1500000}`)
+	assert.Contains(t, recorder.Body.String(), `"success":false`)
+	assert.Equal(t, 150_000, model.GetSZUMonthlyQuotaDefaults().Student)
 }
 
 func performManageUserRequest(t *testing.T, body string) *httptest.ResponseRecorder {

@@ -5634,6 +5634,18 @@
     "If setup fails, verify the service URL, API key, and model ID first. A successful GET /v1/models response confirms that the address and key are valid.": "Nếu cấu hình lỗi, hãy kiểm tra URL dịch vụ, khóa API và ID mô hình trước. GET /v1/models thành công xác nhận URL và khóa hợp lệ.",
     "Request URL": "URL yêu cầu",
     "API format": "Định dạng API",
-    "Authentication field": "Trường xác thực"
+    "Authentication field": "Trường xác thực",
+    "Monthly Quota Settings": "Cài đặt hạn mức hằng tháng",
+    "Configure the monthly free quota granted to each role.": "Thiết lập hạn mức miễn phí được cấp hằng tháng cho từng vai trò.",
+    "Student Monthly Quota": "Hạn mức tháng của sinh viên",
+    "Teacher Monthly Quota": "Hạn mức tháng của giảng viên",
+    "Administrator Monthly Quota": "Hạn mức tháng của quản trị viên",
+    "Each monthly quota must be a positive whole number": "Mỗi hạn mức tháng phải là một số nguyên dương",
+    "Failed to update monthly quotas": "Không thể cập nhật hạn mức hằng tháng",
+    "Monthly quota defaults updated": "Đã cập nhật hạn mức hằng tháng mặc định",
+    "Failed to load monthly quota settings": "Không thể tải cài đặt hạn mức hằng tháng",
+    "quota points": "điểm hạn mức",
+    "Changes apply to monthly grants for all users. Increasing a value tops up only the current month's difference; decreasing it never deducts quota already granted.": "Thay đổi áp dụng cho khoản cấp hằng tháng của mọi người dùng. Khi tăng, hệ thống chỉ bù phần chênh lệch của tháng hiện tại; khi giảm, hệ thống không trừ hạn mức đã cấp.",
+    "Current monthly free quota": "Hạn mức miễn phí tháng hiện tại"
   }
 }

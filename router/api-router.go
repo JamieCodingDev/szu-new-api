@@ -147,6 +147,8 @@ func SetApiRouter(router *gin.Engine) {
 			adminRoute.Use(middleware.AdminAuth())
 			{
 				adminRoute.GET("/", controller.GetAllUsers)
+				adminRoute.GET("/monthly-quota-defaults", controller.GetSZUMonthlyQuotaDefaults)
+				adminRoute.PUT("/monthly-quota-defaults", controller.UpdateSZUMonthlyQuotaDefaults)
 				if !common.SZUQuotaOnlyMode {
 					adminRoute.GET("/topup", controller.GetAllTopUps)
 					adminRoute.POST("/topup/complete", controller.AdminCompleteTopUp)

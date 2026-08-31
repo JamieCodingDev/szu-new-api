@@ -41,9 +41,22 @@ const originalGet = apiClient.get
 let queryClient: InstanceType<typeof QueryClient> | null = null
 
 function renderCreateDrawer() {
-  apiClient.get = async () => ({
-    data: { success: true, data: { resources: [], roles: [] } },
-  })
+  apiClient.get = async (url) => {
+    if (url === '/api/authz/catalog') {
+      return {
+        data: { success: true, data: { resources: [], roles: [] } },
+      }
+    }
+    if (url === '/api/user/monthly-quota-defaults') {
+      return {
+        data: {
+          success: true,
+          data: { student: 100000, teacher: 200000, admin: 1000000 },
+        },
+      }
+    }
+    throw new Error(`Unexpected request: ${url}`)
+  }
   queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
@@ -65,7 +78,7 @@ afterEach(() => {
 })
 
 describe('managed user identity form', () => {
-  test('shows one identifier and one three-option business role', () => {
+  test('shows one identifier, one business role, and its global quota', async () => {
     renderCreateDrawer()
 
     expect(screen.getByLabelText('Username / Email')).toBeInTheDocument()
@@ -74,5 +87,6 @@ describe('managed user identity form', () => {
     expect(screen.queryByLabelText('Display Name')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Email (optional)')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Account Type')).not.toBeInTheDocument()
+    expect(await screen.findByText('100,000 quota points')).toBeInTheDocument()
   })
 })

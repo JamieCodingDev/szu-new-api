@@ -5634,6 +5634,18 @@
     "If setup fails, verify the service URL, API key, and model ID first. A successful GET /v1/models response confirms that the address and key are valid.": "If setup fails, verify the service URL, API key, and model ID first. A successful GET /v1/models response confirms that the address and key are valid.",
     "Request URL": "Request URL",
     "API format": "API format",
-    "Authentication field": "Authentication field"
+    "Authentication field": "Authentication field",
+    "Monthly Quota Settings": "Monthly Quota Settings",
+    "Configure the monthly free quota granted to each role.": "Configure the monthly free quota granted to each role.",
+    "Student Monthly Quota": "Student Monthly Quota",
+    "Teacher Monthly Quota": "Teacher Monthly Quota",
+    "Administrator Monthly Quota": "Administrator Monthly Quota",
+    "Each monthly quota must be a positive whole number": "Each monthly quota must be a positive whole number",
+    "Failed to update monthly quotas": "Failed to update monthly quotas",
+    "Monthly quota defaults updated": "Monthly quota defaults updated",
+    "Failed to load monthly quota settings": "Failed to load monthly quota settings",
+    "quota points": "quota points",
+    "Changes apply to monthly grants for all users. Increasing a value tops up only the current month's difference; decreasing it never deducts quota already granted.": "Changes apply to monthly grants for all users. Increasing a value tops up only the current month's difference; decreasing it never deducts quota already granted.",
+    "Current monthly free quota": "Current monthly free quota"
   }
 }

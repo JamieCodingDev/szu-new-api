@@ -71,7 +71,14 @@ import {
 import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
 
-import { createUser, updateUser, getUser, getPermissionCatalog } from '../api'
+import {
+  createUser,
+  updateUser,
+  getUser,
+  getPermissionCatalog,
+  getMonthlyQuotaDefaults,
+  MONTHLY_QUOTA_DEFAULTS_QUERY_KEY,
+} from '../api'
 import {
   BINDING_FIELDS,
   ERROR_MESSAGES,
@@ -112,6 +119,12 @@ export function UsersMutateDrawer({
     staleTime: 5 * 60 * 1000,
   })
 
+  const { data: monthlyQuotaDefaults } = useQuery({
+    queryKey: MONTHLY_QUOTA_DEFAULTS_QUERY_KEY,
+    queryFn: getMonthlyQuotaDefaults,
+    staleTime: 60 * 1000,
+  })
+
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
     defaultValues: USER_FORM_DEFAULT_VALUES,
@@ -137,6 +150,7 @@ export function UsersMutateDrawer({
   const selectedRole = form.watch('managed_role')
   const canEditAdminPermissions = currentUser?.role === ROLE.SUPER_ADMIN
   const targetIsAdmin = selectedRole === 'admin'
+  const selectedMonthlyQuota = monthlyQuotaDefaults?.[selectedRole]
 
   const onSubmit = async (data: UserFormValues) => {
     if (!isUpdate) {
@@ -268,6 +282,17 @@ export function UsersMutateDrawer({
                         'Role controls account permissions and queue priority'
                       )}
                     </FormDescription>
+                    {selectedMonthlyQuota !== undefined && (
+                      <div className='bg-muted/50 rounded-md border px-3 py-2 text-sm'>
+                        <span className='text-muted-foreground'>
+                          {t('Current monthly free quota')}:{' '}
+                        </span>
+                        <span className='font-medium tabular-nums'>
+                          {selectedMonthlyQuota.toLocaleString()}{' '}
+                          {t('quota points')}
+                        </span>
+                      </div>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}

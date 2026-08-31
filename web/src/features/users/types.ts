@@ -143,8 +143,18 @@ export interface ManageUserQuotaPayload {
   value: number
 }
 
+export interface MonthlyQuotaDefaults {
+  student: number
+  teacher: number
+  admin: number
+}
+
 // ============================================================================
 // Dialog Types
 // ============================================================================
 
-export type UsersDialogType = 'create' | 'update' | 'delete'
+export type UsersDialogType =
+  | 'create'
+  | 'update'
+  | 'delete'
+  | 'monthly-quota-defaults'

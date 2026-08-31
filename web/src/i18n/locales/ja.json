@@ -5634,6 +5634,18 @@
     "If setup fails, verify the service URL, API key, and model ID first. A successful GET /v1/models response confirms that the address and key are valid.": "失敗した場合は、まずサービス URL、API キー、モデル ID を確認してください。GET /v1/models が成功すれば URL とキーは有効です。",
     "Request URL": "リクエスト URL",
     "API format": "API 形式",
-    "Authentication field": "認証フィールド"
+    "Authentication field": "認証フィールド",
+    "Monthly Quota Settings": "月間クォータ設定",
+    "Configure the monthly free quota granted to each role.": "各ロールに毎月付与する無料クォータを設定します。",
+    "Student Monthly Quota": "学生の月間クォータ",
+    "Teacher Monthly Quota": "教員の月間クォータ",
+    "Administrator Monthly Quota": "管理者の月間クォータ",
+    "Each monthly quota must be a positive whole number": "各月間クォータは正の整数である必要があります",
+    "Failed to update monthly quotas": "月間クォータを更新できませんでした",
+    "Monthly quota defaults updated": "月間クォータの既定値を更新しました",
+    "Failed to load monthly quota settings": "月間クォータ設定を読み込めませんでした",
+    "quota points": "クォータポイント",
+    "Changes apply to monthly grants for all users. Increasing a value tops up only the current month's difference; decreasing it never deducts quota already granted.": "変更は全ユーザーの月間付与に適用されます。増額時は当月の差額のみを追加し、減額しても付与済みのクォータは差し引かれません。",
+    "Current monthly free quota": "現在の月間無料クォータ"
   }
 }

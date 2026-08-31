@@ -5634,6 +5634,18 @@
     "If setup fails, verify the service URL, API key, and model ID first. A successful GET /v1/models response confirms that the address and key are valid.": "如果配置失败，请先核对服务地址、API 密钥和模型 ID。GET /v1/models 能成功返回，说明地址和密钥有效。",
     "Request URL": "请求地址",
     "API format": "API 格式",
-    "Authentication field": "认证字段"
+    "Authentication field": "认证字段",
+    "Monthly Quota Settings": "月度额度设置",
+    "Configure the monthly free quota granted to each role.": "设置各角色每月发放的免费额度。",
+    "Student Monthly Quota": "学生月度额度",
+    "Teacher Monthly Quota": "教师月度额度",
+    "Administrator Monthly Quota": "管理员月度额度",
+    "Each monthly quota must be a positive whole number": "每个月度额度必须是正整数",
+    "Failed to update monthly quotas": "月度额度更新失败",
+    "Monthly quota defaults updated": "月度额度默认值已更新",
+    "Failed to load monthly quota settings": "月度额度设置加载失败",
+    "quota points": "额度点",
+    "Changes apply to monthly grants for all users. Increasing a value tops up only the current month's difference; decreasing it never deducts quota already granted.": "修改对所有用户的月度发放生效。调高时仅补发本月差额；调低不会扣除已经发放的额度。",
+    "Current monthly free quota": "当前每月免费额度"
   }
 }

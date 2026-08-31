@@ -147,6 +147,9 @@ func InitOptionMap() {
 	common.OptionMap["QuotaForNewUser"] = "0"
 	common.OptionMap["QuotaForInviter"] = "0"
 	common.OptionMap["QuotaForInvitee"] = "0"
+	common.OptionMap[SZUStudentMonthlyQuotaOptionKey] = strconv.Itoa(SZUStudentMonthlyQuota)
+	common.OptionMap[SZUTeacherMonthlyQuotaOptionKey] = strconv.Itoa(SZUTeacherMonthlyQuota)
+	common.OptionMap[SZUAdminMonthlyQuotaOptionKey] = strconv.Itoa(SZUAdminMonthlyQuota)
 	common.OptionMap["QuotaRemindThreshold"] = strconv.Itoa(common.QuotaRemindThreshold)
 	common.OptionMap["PreConsumedQuota"] = strconv.Itoa(common.PreConsumedQuota)
 	common.OptionMap["ModelRequestRateLimitCount"] = strconv.Itoa(setting.ModelRequestRateLimitCount)

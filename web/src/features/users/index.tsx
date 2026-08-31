@@ -20,6 +20,7 @@ import { useTranslation } from 'react-i18next'
 
 import { SectionPageLayout } from '@/components/layout'
 
+import { MonthlyQuotaDefaultsDialog } from './components/monthly-quota-defaults-dialog'
 import { UsersDeleteDialog } from './components/users-delete-dialog'
 import { UsersMutateDrawer } from './components/users-mutate-drawer'
 import { UsersPrimaryButtons } from './components/users-primary-buttons'
@@ -46,6 +47,10 @@ function UsersContent() {
         open={open === 'create' || open === 'update'}
         onOpenChange={(isOpen) => !isOpen && setOpen(null)}
         currentRow={open === 'update' ? currentRow || undefined : undefined}
+      />
+      <MonthlyQuotaDefaultsDialog
+        open={open === 'monthly-quota-defaults'}
+        onOpenChange={(isOpen) => !isOpen && setOpen(null)}
       />
       <UsersDeleteDialog />
     </>
