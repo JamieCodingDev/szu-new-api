@@ -20,6 +20,7 @@ import type { ColumnDef } from '@tanstack/react-table'
 
 import { LongText } from '@/components/long-text'
 import type { UsageLog } from '@/features/usage-logs/data/schema'
+import { toIntlLocale } from '@/i18n/languages'
 import {
   formatNumber,
   formatTimestampToDate,
@@ -31,8 +32,9 @@ type Translate = (key: string) => string
 export function buildUsageCallColumns(
   isAdmin: boolean,
   t: Translate,
-  locale: Intl.LocalesArgument
+  locale?: string | null
 ): ColumnDef<UsageLog>[] {
+  const intlLocale = toIntlLocale(locale)
   const columns: ColumnDef<UsageLog>[] = [
     {
       accessorKey: 'created_at',
@@ -93,7 +95,7 @@ export function buildUsageCallColumns(
       header: t('Input Tokens'),
       cell: ({ row }) => (
         <span className='font-mono text-xs tabular-nums'>
-          {formatNumber(row.original.prompt_tokens, locale)}
+          {formatNumber(row.original.prompt_tokens, intlLocale)}
         </span>
       ),
       size: 130,
@@ -105,7 +107,7 @@ export function buildUsageCallColumns(
       header: t('Output Tokens'),
       cell: ({ row }) => (
         <span className='font-mono text-xs tabular-nums'>
-          {formatNumber(row.original.completion_tokens, locale)}
+          {formatNumber(row.original.completion_tokens, intlLocale)}
         </span>
       ),
       size: 130,
@@ -120,7 +122,7 @@ export function buildUsageCallColumns(
         <span className='font-mono text-xs font-semibold tabular-nums'>
           {formatNumber(
             row.original.prompt_tokens + row.original.completion_tokens,
-            locale
+            intlLocale
           )}
         </span>
       ),

@@ -17,6 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import type { ColumnDef } from '@tanstack/react-table'
+import type { ReactElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import type { UsageLog } from '@/features/usage-logs/data/schema'
@@ -52,5 +54,28 @@ describe('embedded usage log columns', () => {
     const columns = buildUsageCallColumns(false, (key) => key, 'en-US')
 
     expect(columns.map(getColumnId)).not.toContain('username')
+  })
+
+  it('formats numbers when i18next supplies the internal zhCN language code', () => {
+    const columns = buildUsageCallColumns(false, (key) => key, 'zhCN')
+    const totalTokensColumn = columns.find(
+      (column) => getColumnId(column) === 'total_tokens'
+    )
+
+    expect(typeof totalTokensColumn?.cell).toBe('function')
+
+    const cell = totalTokensColumn?.cell as (context: unknown) => ReactElement
+    const markup = renderToStaticMarkup(
+      cell({
+        row: {
+          original: {
+            prompt_tokens: 1_000,
+            completion_tokens: 234,
+          },
+        },
+      })
+    )
+
+    expect(markup).toContain('1,234')
   })
 })
