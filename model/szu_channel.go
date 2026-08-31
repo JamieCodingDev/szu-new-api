@@ -1,7 +1,6 @@
 package model
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -10,6 +9,8 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/relaykit/dto"
+	"github.com/QuantumNous/new-api/relaykit/relayconvert"
 	"gorm.io/gorm"
 )
 
@@ -54,9 +55,11 @@ func loadSZUDeepSeekChannelConfig() (szuDeepSeekChannelConfig, error) {
 	return config, nil
 }
 
-// EnsureSZUDeepSeekChannel creates the built-in SZU llama.cpp channel using its
-// OpenAI-compatible API and repairs its routing ability on every master-node
-// startup. It intentionally leaves channels created by administrators untouched.
+// EnsureSZUDeepSeekChannel creates the built-in SZU llama.cpp channel and
+// repairs its protocol routes on every master-node startup. Chat Completions
+// stays native, while Responses and Anthropic Messages are converted to the
+// llama.cpp Chat Completions endpoint. Channels created by administrators are
+// intentionally left untouched.
 func EnsureSZUDeepSeekChannel() error {
 	if DB == nil {
 		return errors.New("database is not initialized")
@@ -66,13 +69,42 @@ func EnsureSZUDeepSeekChannel() error {
 	if err != nil {
 		return err
 	}
-	modelMapping, err := json.Marshal(map[string]string{
+	modelMapping, err := common.Marshal(map[string]string{
 		SZUDeepSeekPublicModel: config.UpstreamModel,
 	})
 	if err != nil {
 		return fmt.Errorf("marshal SZU DeepSeek model mapping: %w", err)
 	}
 	mapping := string(modelMapping)
+	advancedCustom := &dto.AdvancedCustomConfig{
+		Routes: []dto.AdvancedCustomRoute{
+			{
+				IncomingPath: "/v1/chat/completions",
+				UpstreamPath: "/v1/chat/completions",
+				Converter:    relayconvert.ConverterNone,
+			},
+			{
+				IncomingPath: "/v1/responses",
+				UpstreamPath: "/v1/chat/completions",
+				Converter:    relayconvert.ConverterOpenAIResponsesToOpenAIChat,
+			},
+			{
+				IncomingPath: "/v1/messages",
+				UpstreamPath: "/v1/chat/completions",
+				Converter:    relayconvert.ConverterClaudeMessagesToOpenAIChat,
+			},
+		},
+	}
+	if err := advancedCustom.Validate(); err != nil {
+		return fmt.Errorf("validate SZU DeepSeek routes: %w", err)
+	}
+	otherSettings, err := common.Marshal(dto.ChannelOtherSettings{
+		AdvancedCustom: advancedCustom,
+	})
+	if err != nil {
+		return fmt.Errorf("marshal SZU DeepSeek routes: %w", err)
+	}
+	settings := string(otherSettings)
 
 	return DB.Transaction(func(tx *gorm.DB) error {
 		var channel Channel
@@ -83,15 +115,16 @@ func EnsureSZUDeepSeekChannel() error {
 
 		if query.RowsAffected == 0 {
 			channel = Channel{
-				Type:         constant.ChannelTypeOpenAI,
-				Key:          config.APIKey,
-				Status:       common.ChannelStatusEnabled,
-				Name:         SZUDeepSeekChannelName,
-				CreatedTime:  common.GetTimestamp(),
-				BaseURL:      &config.BaseURL,
-				Models:       SZUDeepSeekPublicModel,
-				Group:        defaultSZUDeepSeekGroup,
-				ModelMapping: &mapping,
+				Type:          constant.ChannelTypeAdvancedCustom,
+				Key:           config.APIKey,
+				Status:        common.ChannelStatusEnabled,
+				Name:          SZUDeepSeekChannelName,
+				CreatedTime:   common.GetTimestamp(),
+				BaseURL:       &config.BaseURL,
+				Models:        SZUDeepSeekPublicModel,
+				Group:         defaultSZUDeepSeekGroup,
+				ModelMapping:  &mapping,
+				OtherSettings: settings,
 			}
 			if err := tx.Create(&channel).Error; err != nil {
 				return fmt.Errorf("create SZU DeepSeek channel: %w", err)
@@ -102,13 +135,14 @@ func EnsureSZUDeepSeekChannel() error {
 			return nil
 		}
 
-		channel.Type = constant.ChannelTypeOpenAI
+		channel.Type = constant.ChannelTypeAdvancedCustom
 		channel.Key = config.APIKey
 		channel.Status = common.ChannelStatusEnabled
 		channel.BaseURL = &config.BaseURL
 		channel.Models = SZUDeepSeekPublicModel
 		channel.Group = defaultSZUDeepSeekGroup
 		channel.ModelMapping = &mapping
+		channel.OtherSettings = settings
 		if err := tx.Model(&channel).Select(
 			"type",
 			"key",
@@ -117,6 +151,7 @@ func EnsureSZUDeepSeekChannel() error {
 			"models",
 			"group",
 			"model_mapping",
+			"settings",
 		).Updates(&channel).Error; err != nil {
 			return fmt.Errorf("repair SZU DeepSeek channel: %w", err)
 		}

@@ -25,12 +25,26 @@ func TestEnsureSZUDeepSeekChannelCreatesChannelAndAbility(t *testing.T) {
 
 	var channel Channel
 	require.NoError(t, DB.Where("name = ?", SZUDeepSeekChannelName).First(&channel).Error)
-	assert.Equal(t, constant.ChannelTypeOpenAI, channel.Type)
+	assert.Equal(t, constant.ChannelTypeAdvancedCustom, channel.Type)
 	assert.Equal(t, common.ChannelStatusEnabled, channel.Status)
 	assert.Equal(t, defaultSZUDeepSeekAPIKey, channel.Key)
 	assert.Equal(t, defaultSZUDeepSeekBaseURL, *channel.BaseURL)
 	assert.Equal(t, SZUDeepSeekPublicModel, channel.Models)
 	assert.Equal(t, defaultSZUDeepSeekGroup, channel.Group)
+
+	advancedCustom := channel.GetOtherSettings().AdvancedCustom
+	require.NotNil(t, advancedCustom)
+	require.NoError(t, advancedCustom.Validate())
+	require.Len(t, advancedCustom.Routes, 3)
+	assert.Equal(t, "/v1/chat/completions", advancedCustom.Routes[0].IncomingPath)
+	assert.Equal(t, "/v1/chat/completions", advancedCustom.Routes[0].UpstreamPath)
+	assert.Equal(t, "none", advancedCustom.Routes[0].Converter)
+	assert.Equal(t, "/v1/responses", advancedCustom.Routes[1].IncomingPath)
+	assert.Equal(t, "/v1/chat/completions", advancedCustom.Routes[1].UpstreamPath)
+	assert.Equal(t, "openai_responses_to_openai_chat_completions", advancedCustom.Routes[1].Converter)
+	assert.Equal(t, "/v1/messages", advancedCustom.Routes[2].IncomingPath)
+	assert.Equal(t, "/v1/chat/completions", advancedCustom.Routes[2].UpstreamPath)
+	assert.Equal(t, "anthropic_messages_to_openai_chat_completions", advancedCustom.Routes[2].Converter)
 
 	var mapping map[string]string
 	require.NoError(t, json.Unmarshal([]byte(*channel.ModelMapping), &mapping))
@@ -60,6 +74,7 @@ func TestEnsureSZUDeepSeekChannelIsIdempotentAndRepairsConfiguration(t *testing.
 		"models":        "wrong-model",
 		"group":         "wrong-group",
 		"model_mapping": wrongMapping,
+		"settings":      "{}",
 	}).Error)
 	require.NoError(t, DB.Where("channel_id = ?", original.Id).Delete(&Ability{}).Error)
 
@@ -74,7 +89,7 @@ func TestEnsureSZUDeepSeekChannelIsIdempotentAndRepairsConfiguration(t *testing.
 	require.Len(t, channels, 1)
 	channel := channels[0]
 	assert.Equal(t, original.Id, channel.Id)
-	assert.Equal(t, constant.ChannelTypeOpenAI, channel.Type)
+	assert.Equal(t, constant.ChannelTypeAdvancedCustom, channel.Type)
 	assert.Equal(t, common.ChannelStatusEnabled, channel.Status)
 	assert.Equal(t, "internal-key", channel.Key)
 	assert.Equal(t, "http://llama.internal:8000", *channel.BaseURL)
@@ -84,6 +99,12 @@ func TestEnsureSZUDeepSeekChannelIsIdempotentAndRepairsConfiguration(t *testing.
 	var mapping map[string]string
 	require.NoError(t, json.Unmarshal([]byte(*channel.ModelMapping), &mapping))
 	assert.Equal(t, "deepseek-custom", mapping[SZUDeepSeekPublicModel])
+	advancedCustom := channel.GetOtherSettings().AdvancedCustom
+	require.NotNil(t, advancedCustom)
+	require.NoError(t, advancedCustom.Validate())
+	require.Len(t, advancedCustom.Routes, 3)
+	assert.Equal(t, "/v1/responses", advancedCustom.Routes[1].IncomingPath)
+	assert.Equal(t, "/v1/chat/completions", advancedCustom.Routes[1].UpstreamPath)
 
 	var abilities []Ability
 	require.NoError(t, DB.Where("channel_id = ?", channel.Id).Find(&abilities).Error)
