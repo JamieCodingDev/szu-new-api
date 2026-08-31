@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/relaykit/dto"
+	kitutil "github.com/QuantumNous/new-api/relaykit/relayconvert/kitutil"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -118,18 +119,91 @@ func TestChatCompletionsStreamToResponsesEventsAggregatesUsageAndToolArgs(t *tes
 	})...)
 	events = append(events, FinalizeChatCompletionsStreamToResponses(state)...)
 
-	require.Len(t, events, 10)
-	assert.Equal(t, responsesEventCreated, events[0].Type)
-	assert.Equal(t, responsesEventOutputTextDelta, events[2].Type)
-	assert.Equal(t, "hello", events[2].Payload.Delta)
-	assert.Equal(t, responsesEventFunctionArgsDelta, events[4].Type)
-	assert.Equal(t, `{"q":"x"}`, events[4].Payload.Delta)
-	assert.Equal(t, responsesEventCompleted, events[9].Type)
-	require.NotNil(t, events[9].Payload.Response)
-	assert.Equal(t, 6, events[9].Payload.Response.Usage.TotalTokens)
-	require.Len(t, events[9].Payload.Response.Output, 2)
-	assert.Equal(t, "hello", events[9].Payload.Response.Output[0].Content[0].Text)
-	assert.Equal(t, `"{\"q\":\"x\"}"`, string(events[9].Payload.Response.Output[1].Arguments))
+	require.Len(t, events, 12)
+	assert.Equal(t, []string{
+		responsesEventCreated,
+		responsesEventOutputItemAdded,
+		responsesEventContentPartAdded,
+		responsesEventOutputTextDelta,
+		responsesEventOutputItemAdded,
+		responsesEventFunctionArgsDelta,
+		responsesEventOutputTextDone,
+		responsesEventContentPartDone,
+		responsesEventOutputItemDone,
+		responsesEventFunctionArgsDone,
+		responsesEventOutputItemDone,
+		responsesEventCompleted,
+	}, responseEventTypes(events))
+	for index, event := range events {
+		require.NotNil(t, event.Payload.SequenceNumber)
+		assert.Equal(t, index, *event.Payload.SequenceNumber)
+	}
+
+	assert.Equal(t, "hello", events[3].Payload.Delta)
+	assert.Equal(t, "hello", events[6].Payload.Text)
+	require.NotNil(t, events[7].Payload.Part)
+	assert.Equal(t, "output_text", events[7].Payload.Part.Type)
+	assert.Equal(t, "hello", events[7].Payload.Part.Text)
+	assert.Equal(t, `{"q":"x"}`, events[5].Payload.Delta)
+	assert.Equal(t, `{"q":"x"}`, events[9].Payload.Arguments)
+
+	completed := events[11].Payload.Response
+	require.NotNil(t, completed)
+	assert.Equal(t, 6, completed.Usage.TotalTokens)
+	require.Len(t, completed.Output, 2)
+	assert.Equal(t, "hello", completed.Output[0].Content[0].Text)
+	assert.Equal(t, `"{\"q\":\"x\"}"`, string(completed.Output[1].Arguments))
+}
+
+func TestChatCompletionsStreamToResponsesRestoresNamespacedCustomTool(t *testing.T) {
+	state := NewChatToResponsesStreamState("resp_custom", "gpt-test")
+	toolIndex := 0
+	encodedName := kitutil.EncodeResponsesToolName("collaboration", "apply_patch", "custom")
+
+	events := mustResponsesEventsFromChatChunk(t, state, &dto.ChatCompletionsStreamResponse{
+		Choices: []dto.ChatCompletionsStreamResponseChoice{
+			{Index: 0, Delta: dto.ChatCompletionsStreamResponseChoiceDelta{ToolCalls: []dto.ToolCallResponse{
+				{
+					Index: &toolIndex,
+					ID:    "call_custom",
+					Type:  "function",
+					Function: dto.FunctionResponse{
+						Name:      encodedName,
+						Arguments: `{"input":"patch body"}`,
+					},
+				},
+			}}},
+		},
+	})
+	finishReason := "tool_calls"
+	events = append(events, mustResponsesEventsFromChatChunk(t, state, &dto.ChatCompletionsStreamResponse{
+		Choices: []dto.ChatCompletionsStreamResponseChoice{{Index: 0, FinishReason: &finishReason}},
+	})...)
+	events = append(events, FinalizeChatCompletionsStreamToResponses(state)...)
+
+	assert.Equal(t, []string{
+		responsesEventCreated,
+		responsesEventOutputItemAdded,
+		responsesEventCustomToolInputDelta,
+		responsesEventCustomToolInputDone,
+		responsesEventOutputItemDone,
+		responsesEventCompleted,
+	}, responseEventTypes(events))
+	assert.Equal(t, "patch body", events[2].Payload.Delta)
+	assert.Equal(t, "patch body", events[3].Payload.Input)
+	require.NotNil(t, events[4].Payload.Item)
+	assert.Equal(t, responsesOutputTypeCustomToolCall, events[4].Payload.Item.Type)
+	assert.Equal(t, "collaboration", events[4].Payload.Item.Namespace)
+	assert.Equal(t, "apply_patch", events[4].Payload.Item.Name)
+	assert.Equal(t, "patch body", events[4].Payload.Item.Input)
+}
+
+func responseEventTypes(events []ChatToResponsesStreamEvent) []string {
+	types := make([]string, 0, len(events))
+	for _, event := range events {
+		types = append(types, event.Type)
+	}
+	return types
 }
 
 func mustResponsesEventsFromChatChunk(t *testing.T, state *ChatToResponsesStreamState, chunk *dto.ChatCompletionsStreamResponse) []ChatToResponsesStreamEvent {

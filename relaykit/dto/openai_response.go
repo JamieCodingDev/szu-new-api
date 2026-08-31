@@ -334,7 +334,9 @@ type ResponsesOutput struct {
 	Size      string                   `json:"size"`
 	Result    string                   `json:"result,omitempty"`
 	CallId    string                   `json:"call_id,omitempty"`
+	Namespace string                   `json:"namespace,omitempty"`
 	Name      string                   `json:"name,omitempty"`
+	Input     string                   `json:"input,omitempty"`
 	Arguments json.RawMessage          `json:"arguments,omitempty"`
 }
 
@@ -358,8 +360,9 @@ type ResponsesOutputContent struct {
 }
 
 type ResponsesReasoningSummaryPart struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
+	Type        string         `json:"type"`
+	Text        string         `json:"text"`
+	Annotations *[]interface{} `json:"annotations,omitempty"`
 }
 
 const (
@@ -384,10 +387,14 @@ const (
 
 // ResponsesStreamResponse 用于处理 /v1/responses 流式响应
 type ResponsesStreamResponse struct {
-	Type     string                   `json:"type"`
-	Response *OpenAIResponsesResponse `json:"response,omitempty"`
-	Delta    string                   `json:"delta,omitempty"`
-	Item     *ResponsesOutput         `json:"item,omitempty"`
+	Type           string                   `json:"type"`
+	SequenceNumber *int                     `json:"sequence_number,omitempty"`
+	Response       *OpenAIResponsesResponse `json:"response,omitempty"`
+	Delta          string                   `json:"delta,omitempty"`
+	Text           string                   `json:"text,omitempty"`
+	Input          string                   `json:"input,omitempty"`
+	Arguments      string                   `json:"arguments,omitempty"`
+	Item           *ResponsesOutput         `json:"item,omitempty"`
 	// - response.function_call_arguments.delta
 	// - response.function_call_arguments.done
 	OutputIndex  *int                           `json:"output_index,omitempty"`

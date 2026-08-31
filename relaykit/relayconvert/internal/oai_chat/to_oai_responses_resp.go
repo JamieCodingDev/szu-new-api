@@ -14,21 +14,29 @@ const (
 	chatFinishReasonLength        = "length"
 	chatFinishReasonContentFilter = "content_filter"
 
-	responsesEventCreated                  = "response.created"
-	responsesEventCompleted                = "response.completed"
-	responsesEventIncomplete               = "response.incomplete"
-	responsesEventOutputTextDelta          = "response.output_text.delta"
-	responsesEventOutputItemAdded          = "response.output_item.added"
-	responsesEventOutputItemDone           = "response.output_item.done"
-	responsesEventFunctionArgsDelta        = "response.function_call_arguments.delta"
-	responsesEventFunctionArgsDone         = "response.function_call_arguments.done"
-	responsesEventReasoningSummaryDelta    = "response.reasoning_summary_text.delta"
-	responsesEventReasoningSummaryDone     = "response.reasoning_summary_text.done"
-	responsesOutputTypeFunctionCall        = "function_call"
-	responsesOutputTypeMessage             = "message"
-	responsesOutputTypeReasoning           = "reasoning"
-	responsesIncompleteReasonContentFilter = "content_filter"
-	responsesIncompleteReasonMaxTokens     = "max_output_tokens"
+	responsesEventCreated                   = "response.created"
+	responsesEventCompleted                 = "response.completed"
+	responsesEventIncomplete                = "response.incomplete"
+	responsesEventOutputTextDelta           = "response.output_text.delta"
+	responsesEventOutputTextDone            = "response.output_text.done"
+	responsesEventContentPartAdded          = "response.content_part.added"
+	responsesEventContentPartDone           = "response.content_part.done"
+	responsesEventOutputItemAdded           = "response.output_item.added"
+	responsesEventOutputItemDone            = "response.output_item.done"
+	responsesEventFunctionArgsDelta         = "response.function_call_arguments.delta"
+	responsesEventFunctionArgsDone          = "response.function_call_arguments.done"
+	responsesEventCustomToolInputDelta      = "response.custom_tool_call_input.delta"
+	responsesEventCustomToolInputDone       = "response.custom_tool_call_input.done"
+	responsesEventReasoningSummaryPartAdded = "response.reasoning_summary_part.added"
+	responsesEventReasoningSummaryPartDone  = "response.reasoning_summary_part.done"
+	responsesEventReasoningSummaryDelta     = "response.reasoning_summary_text.delta"
+	responsesEventReasoningSummaryDone      = "response.reasoning_summary_text.done"
+	responsesOutputTypeFunctionCall         = "function_call"
+	responsesOutputTypeCustomToolCall       = "custom_tool_call"
+	responsesOutputTypeMessage              = "message"
+	responsesOutputTypeReasoning            = "reasoning"
+	responsesIncompleteReasonContentFilter  = "content_filter"
+	responsesIncompleteReasonMaxTokens      = "max_output_tokens"
 )
 
 func ChatCompletionsResponseToResponsesResponse(resp *dto.OpenAITextResponse, id string) (*dto.OpenAIResponsesResponse, *dto.Usage, error) {
@@ -174,13 +182,26 @@ func chatToolCallToResponsesOutput(toolCall dto.ToolCallRequest, responseID stri
 	if callID == "" {
 		callID = fmt.Sprintf("%s_call_%d", responseID, index)
 	}
+	namespace, name, toolType := responsesToolIdentity(toolCall.Function.Name)
+	if toolType == responsesOutputTypeCustomToolCall {
+		return dto.ResponsesOutput{
+			Type:      responsesOutputTypeCustomToolCall,
+			ID:        callID,
+			Status:    status,
+			CallId:    callID,
+			Namespace: namespace,
+			Name:      name,
+			Input:     responsesCustomToolInput(toolCall.Function.Arguments),
+		}, nil
+	}
 	if toolCall.Type == "" || toolCall.Type == "function" {
 		return dto.ResponsesOutput{
 			Type:      responsesOutputTypeFunctionCall,
 			ID:        callID,
 			Status:    status,
 			CallId:    callID,
-			Name:      toolCall.Function.Name,
+			Namespace: namespace,
+			Name:      name,
 			Arguments: chatArgumentsRawMessage(toolCall.Function.Arguments),
 		}, nil
 	}
@@ -191,6 +212,27 @@ func chatToolCallToResponsesOutput(toolCall dto.ToolCallRequest, responseID stri
 		CallId:    callID,
 		Arguments: toolCall.Custom,
 	}, nil
+}
+
+func responsesToolIdentity(encodedName string) (namespace string, name string, toolType string) {
+	namespace, name, toolType, ok := kitutil.DecodeResponsesToolName(strings.TrimSpace(encodedName))
+	if ok {
+		if toolType == "custom" {
+			toolType = responsesOutputTypeCustomToolCall
+		}
+		return namespace, name, toolType
+	}
+	return "", strings.TrimSpace(encodedName), responsesOutputTypeFunctionCall
+}
+
+func responsesCustomToolInput(arguments string) string {
+	var payload map[string]any
+	if err := kitutil.Unmarshal([]byte(arguments), &payload); err == nil {
+		if input, ok := payload["input"].(string); ok {
+			return input
+		}
+	}
+	return arguments
 }
 
 func chatArgumentsRawMessage(arguments string) []byte {
@@ -219,8 +261,10 @@ func chatCreatedAt(created any) int {
 	return int(time.Now().Unix())
 }
 
-func responsesStreamEvent(eventType string, payload dto.ResponsesStreamResponse) ChatToResponsesStreamEvent {
+func (s *ChatToResponsesStreamState) responsesStreamEvent(eventType string, payload dto.ResponsesStreamResponse) ChatToResponsesStreamEvent {
 	payload.Type = eventType
+	payload.SequenceNumber = intPtr(s.nextSequenceNumber)
+	s.nextSequenceNumber++
 	return ChatToResponsesStreamEvent{
 		Type:    eventType,
 		Payload: payload,
@@ -229,4 +273,9 @@ func responsesStreamEvent(eventType string, payload dto.ResponsesStreamResponse)
 
 func intPtr(v int) *int {
 	return &v
+}
+
+func emptyAnnotations() *[]interface{} {
+	annotations := []interface{}{}
+	return &annotations
 }

@@ -4,6 +4,7 @@
       "Type": "response.created",
       "Payload": {
         "type": "response.created",
+        "sequence_number": 0,
         "response": {
           "id": "stream_fixed",
           "object": "response",
@@ -32,6 +33,7 @@
       "Type": "response.output_item.added",
       "Payload": {
         "type": "response.output_item.added",
+        "sequence_number": 1,
         "item": {
           "type": "message",
           "id": "stream_fixed_msg_0",
@@ -45,9 +47,25 @@
       }
     },
     {
+      "Type": "response.content_part.added",
+      "Payload": {
+        "type": "response.content_part.added",
+        "sequence_number": 2,
+        "output_index": 0,
+        "content_index": 0,
+        "item_id": "stream_fixed_msg_0",
+        "part": {
+          "type": "output_text",
+          "text": "",
+          "annotations": []
+        }
+      }
+    },
+    {
       "Type": "response.output_text.delta",
       "Payload": {
         "type": "response.output_text.delta",
+        "sequence_number": 3,
         "delta": "Hello world",
         "output_index": 0,
         "content_index": 0,
@@ -58,15 +76,33 @@
       "Type": "response.output_text.done",
       "Payload": {
         "type": "response.output_text.done",
+        "sequence_number": 4,
+        "text": "Hello world",
         "output_index": 0,
         "content_index": 0,
         "item_id": "stream_fixed_msg_0"
       }
     },
     {
+      "Type": "response.content_part.done",
+      "Payload": {
+        "type": "response.content_part.done",
+        "sequence_number": 5,
+        "output_index": 0,
+        "content_index": 0,
+        "item_id": "stream_fixed_msg_0",
+        "part": {
+          "type": "output_text",
+          "text": "Hello world",
+          "annotations": []
+        }
+      }
+    },
+    {
       "Type": "response.output_item.done",
       "Payload": {
         "type": "response.output_item.done",
+        "sequence_number": 6,
         "item": {
           "type": "message",
           "id": "stream_fixed_msg_0",
@@ -89,6 +125,7 @@
       "Type": "response.completed",
       "Payload": {
         "type": "response.completed",
+        "sequence_number": 7,
         "response": {
           "id": "stream_fixed",
           "object": "response",

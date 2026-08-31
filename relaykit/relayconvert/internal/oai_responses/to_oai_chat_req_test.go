@@ -232,29 +232,118 @@ func TestResponsesRequestToChatCompletionsRequestToolsToolChoiceAndTextFormat(t 
 	assert.True(t, gjson.GetBytes(got.ResponseFormat.JsonSchema, "strict").Bool())
 }
 
-func TestResponsesRequestToChatCompletionsRequestCustomToolCallPreservesRawShape(t *testing.T) {
+func TestResponsesRequestToChatCompletionsRequestFlattensNamespaceAndCustomTools(t *testing.T) {
+	got, err := ResponsesRequestToChatCompletionsRequest(&dto.OpenAIResponsesRequest{
+		Model: "gpt-test",
+		Input: mustRawMessage(t, "hello"),
+		Tools: mustRawMessage(t, []map[string]any{
+			{
+				"type":        "namespace",
+				"name":        "collaboration",
+				"description": "Agent tools",
+				"tools": []map[string]any{
+					{
+						"type":        "function",
+						"name":        "spawn_agent",
+						"description": "Spawn an agent",
+						"parameters":  map[string]any{"type": "object"},
+					},
+					{
+						"type":        "custom",
+						"name":        "apply_patch",
+						"description": "Apply a patch",
+					},
+				},
+			},
+		}),
+	})
+	require.NoError(t, err)
+	require.Len(t, got.Tools, 2)
+
+	for index, want := range []struct {
+		name     string
+		toolType string
+	}{
+		{name: "spawn_agent", toolType: "function"},
+		{name: "apply_patch", toolType: "custom"},
+	} {
+		tool := got.Tools[index]
+		assert.Equal(t, "function", tool.Type)
+		namespace, name, toolType, ok := kitutil.DecodeResponsesToolName(tool.Function.Name)
+		require.True(t, ok)
+		assert.Equal(t, "collaboration", namespace)
+		assert.Equal(t, want.name, name)
+		assert.Equal(t, want.toolType, toolType)
+	}
+	assert.Equal(t, []string{"input"}, got.Tools[1].Function.Parameters.(map[string]any)["required"])
+}
+
+func TestResponsesRequestToChatCompletionsRequestEncodesCustomToolCallForChat(t *testing.T) {
 	got, err := ResponsesRequestToChatCompletionsRequest(&dto.OpenAIResponsesRequest{
 		Model: "gpt-test",
 		Input: mustRawMessage(t, []map[string]any{
 			{
-				"type":    "custom_tool_call",
+				"type":      "custom_tool_call",
+				"call_id":   "call_custom",
+				"namespace": "collaboration",
+				"name":      "apply_patch",
+				"input":     "patch body",
+			},
+			{
+				"type":    "custom_tool_call_output",
 				"call_id": "call_custom",
-				"name":    "apply_patch",
-				"input":   "patch body",
+				"output":  "done",
 			},
 		}),
 	})
 	require.NoError(t, err)
 
-	require.Len(t, got.Messages, 1)
+	require.Len(t, got.Messages, 2)
 	toolCalls := got.Messages[0].ParseToolCalls()
 	require.Len(t, toolCalls, 1)
-	assert.Equal(t, dto.CustomType, toolCalls[0].Type)
+	assert.Equal(t, "function", toolCalls[0].Type)
 	assert.Equal(t, "call_custom", toolCalls[0].ID)
-	assert.Equal(t, "apply_patch", toolCalls[0].Function.Name)
-	assert.Equal(t, "patch body", toolCalls[0].Function.Arguments)
-	assert.Equal(t, "custom_tool_call", gjson.GetBytes(toolCalls[0].Custom, "type").String())
-	assert.Equal(t, "patch body", gjson.GetBytes(toolCalls[0].Custom, "input").String())
+	namespace, name, toolType, ok := kitutil.DecodeResponsesToolName(toolCalls[0].Function.Name)
+	require.True(t, ok)
+	assert.Equal(t, "collaboration", namespace)
+	assert.Equal(t, "apply_patch", name)
+	assert.Equal(t, "custom", toolType)
+	assert.Equal(t, "patch body", gjson.Get(toolCalls[0].Function.Arguments, "input").String())
+	assert.Equal(t, "tool", got.Messages[1].Role)
+	assert.Equal(t, "call_custom", got.Messages[1].ToolCallId)
+	assert.Equal(t, "done", got.Messages[1].Content)
+}
+
+func TestResponsesRequestToChatCompletionsRequestReencodesNamespacedFunctionCall(t *testing.T) {
+	got, err := ResponsesRequestToChatCompletionsRequest(&dto.OpenAIResponsesRequest{
+		Model: "gpt-test",
+		Input: mustRawMessage(t, []map[string]any{
+			{
+				"type":      "function_call",
+				"call_id":   "call_function",
+				"namespace": "collaboration",
+				"name":      "spawn_agent",
+				"arguments": `{"message":"test"}`,
+			},
+			{
+				"type":    "function_call_output",
+				"call_id": "call_function",
+				"output":  "done",
+			},
+		}),
+	})
+	require.NoError(t, err)
+
+	require.Len(t, got.Messages, 2)
+	toolCalls := got.Messages[0].ParseToolCalls()
+	require.Len(t, toolCalls, 1)
+	namespace, name, toolType, ok := kitutil.DecodeResponsesToolName(toolCalls[0].Function.Name)
+	require.True(t, ok)
+	assert.Equal(t, "collaboration", namespace)
+	assert.Equal(t, "spawn_agent", name)
+	assert.Equal(t, "function", toolType)
+	assert.Equal(t, `{"message":"test"}`, toolCalls[0].Function.Arguments)
+	assert.Equal(t, "call_function", got.Messages[1].ToolCallId)
 }
 
 func TestResponsesRequestToChatCompletionsRequestRejectsStatefulFields(t *testing.T) {
