@@ -16,8 +16,8 @@ import (
 const (
 	SZUDeepSeekChannelName    = "SZU DeepSeek V4 Flash"
 	SZUDeepSeekPublicModel    = "deepseek-v4-flash"
-	defaultSZUDeepSeekBaseURL = "http://deepseek-infer.incus:11434"
-	defaultSZUDeepSeekModel   = "deepseek-v4-flash:latest"
+	defaultSZUDeepSeekBaseURL = "http://deepseek-infer.incus:8000"
+	defaultSZUDeepSeekModel   = "deepseek-v4-flash"
 	defaultSZUDeepSeekAPIKey  = "local"
 	defaultSZUDeepSeekGroup   = "default"
 )
@@ -54,9 +54,9 @@ func loadSZUDeepSeekChannelConfig() (szuDeepSeekChannelConfig, error) {
 	return config, nil
 }
 
-// EnsureSZUDeepSeekChannel creates the built-in SZU Ollama channel and repairs
-// its routing ability on every master-node startup. It intentionally leaves
-// channels created by administrators untouched.
+// EnsureSZUDeepSeekChannel creates the built-in SZU llama.cpp channel using its
+// OpenAI-compatible API and repairs its routing ability on every master-node
+// startup. It intentionally leaves channels created by administrators untouched.
 func EnsureSZUDeepSeekChannel() error {
 	if DB == nil {
 		return errors.New("database is not initialized")
@@ -83,7 +83,7 @@ func EnsureSZUDeepSeekChannel() error {
 
 		if query.RowsAffected == 0 {
 			channel = Channel{
-				Type:         constant.ChannelTypeOllama,
+				Type:         constant.ChannelTypeOpenAI,
 				Key:          config.APIKey,
 				Status:       common.ChannelStatusEnabled,
 				Name:         SZUDeepSeekChannelName,
@@ -102,7 +102,7 @@ func EnsureSZUDeepSeekChannel() error {
 			return nil
 		}
 
-		channel.Type = constant.ChannelTypeOllama
+		channel.Type = constant.ChannelTypeOpenAI
 		channel.Key = config.APIKey
 		channel.Status = common.ChannelStatusEnabled
 		channel.BaseURL = &config.BaseURL

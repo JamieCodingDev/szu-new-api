@@ -25,7 +25,7 @@ func TestEnsureSZUDeepSeekChannelCreatesChannelAndAbility(t *testing.T) {
 
 	var channel Channel
 	require.NoError(t, DB.Where("name = ?", SZUDeepSeekChannelName).First(&channel).Error)
-	assert.Equal(t, constant.ChannelTypeOllama, channel.Type)
+	assert.Equal(t, constant.ChannelTypeOpenAI, channel.Type)
 	assert.Equal(t, common.ChannelStatusEnabled, channel.Status)
 	assert.Equal(t, defaultSZUDeepSeekAPIKey, channel.Key)
 	assert.Equal(t, defaultSZUDeepSeekBaseURL, *channel.BaseURL)
@@ -53,7 +53,7 @@ func TestEnsureSZUDeepSeekChannelIsIdempotentAndRepairsConfiguration(t *testing.
 	wrongBaseURL := "http://wrong.invalid"
 	wrongMapping := `{"wrong":"model"}`
 	require.NoError(t, DB.Model(&original).Updates(map[string]any{
-		"type":          constant.ChannelTypeOpenAI,
+		"type":          constant.ChannelTypeOllama,
 		"key":           "wrong",
 		"status":        2,
 		"base_url":      wrongBaseURL,
@@ -63,8 +63,8 @@ func TestEnsureSZUDeepSeekChannelIsIdempotentAndRepairsConfiguration(t *testing.
 	}).Error)
 	require.NoError(t, DB.Where("channel_id = ?", original.Id).Delete(&Ability{}).Error)
 
-	t.Setenv("SZU_DEEPSEEK_BASE_URL", "http://ollama.internal:11434/")
-	t.Setenv("SZU_DEEPSEEK_UPSTREAM_MODEL", "deepseek-custom:latest")
+	t.Setenv("SZU_DEEPSEEK_BASE_URL", "http://llama.internal:8000/")
+	t.Setenv("SZU_DEEPSEEK_UPSTREAM_MODEL", "deepseek-custom")
 	t.Setenv("SZU_DEEPSEEK_API_KEY", "internal-key")
 	require.NoError(t, EnsureSZUDeepSeekChannel())
 	require.NoError(t, EnsureSZUDeepSeekChannel())
@@ -74,16 +74,16 @@ func TestEnsureSZUDeepSeekChannelIsIdempotentAndRepairsConfiguration(t *testing.
 	require.Len(t, channels, 1)
 	channel := channels[0]
 	assert.Equal(t, original.Id, channel.Id)
-	assert.Equal(t, constant.ChannelTypeOllama, channel.Type)
+	assert.Equal(t, constant.ChannelTypeOpenAI, channel.Type)
 	assert.Equal(t, common.ChannelStatusEnabled, channel.Status)
 	assert.Equal(t, "internal-key", channel.Key)
-	assert.Equal(t, "http://ollama.internal:11434", *channel.BaseURL)
+	assert.Equal(t, "http://llama.internal:8000", *channel.BaseURL)
 	assert.Equal(t, SZUDeepSeekPublicModel, channel.Models)
 	assert.Equal(t, defaultSZUDeepSeekGroup, channel.Group)
 
 	var mapping map[string]string
 	require.NoError(t, json.Unmarshal([]byte(*channel.ModelMapping), &mapping))
-	assert.Equal(t, "deepseek-custom:latest", mapping[SZUDeepSeekPublicModel])
+	assert.Equal(t, "deepseek-custom", mapping[SZUDeepSeekPublicModel])
 
 	var abilities []Ability
 	require.NoError(t, DB.Where("channel_id = ?", channel.Id).Find(&abilities).Error)
@@ -95,7 +95,7 @@ func TestEnsureSZUDeepSeekChannelIsIdempotentAndRepairsConfiguration(t *testing.
 
 func TestEnsureSZUDeepSeekChannelRejectsInvalidBaseURL(t *testing.T) {
 	truncateTables(t)
-	t.Setenv("SZU_DEEPSEEK_BASE_URL", "deepseek-infer.incus:11434")
+	t.Setenv("SZU_DEEPSEEK_BASE_URL", "deepseek-infer.incus:8000")
 
 	err := EnsureSZUDeepSeekChannel()
 	require.Error(t, err)
