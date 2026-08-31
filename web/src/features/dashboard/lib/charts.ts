@@ -195,6 +195,15 @@ export function processChartData(
           text: tt('Call Trend'),
         },
       },
+      spec_token_bar: {
+        type: 'bar',
+        data: [{ id: 'tokenData', values: [] }],
+        xField: 'Time',
+        yField: 'Tokens',
+        seriesField: 'Model',
+        stack: true,
+        legends: { visible: true, selectMode: 'single' },
+      },
       spec_rank_bar: {
         type: 'bar',
         data: [{ id: 'rankData', values: [] }],
@@ -209,6 +218,7 @@ export function processChartData(
       },
       totalQuotaDisplay: formatQuotaTotal(0),
       totalCountDisplay: formatInt(0),
+      totalTokensDisplay: formatInt(0),
     }
   }
 
@@ -301,6 +311,10 @@ export function processChartData(
   )
   const totalQuotaRaw = Array.from(modelTotalsMap.values()).reduce(
     (sum, x) => sum + (Number(x.quota) || 0),
+    0
+  )
+  const totalTokensRaw = [...modelTotalsMap.values()].reduce(
+    (sum, x) => sum + (Number(x.tokens) || 0),
     0
   )
 
@@ -429,6 +443,46 @@ export function processChartData(
     modelLineValues.push(...timeData)
   })
   modelLineValues.sort((a, b) => a.Time.localeCompare(b.Time))
+
+  // Stacked bars: token usage by model over time.
+  const rankedTokenModels = [...modelTotalsMap.entries()]
+    .map(([model, stats]) => ({
+      Model: model,
+      Tokens: Number(stats.tokens) || 0,
+    }))
+    .sort((a, b) => b.Tokens - a.Tokens)
+  const topTokenModels = rankedTokenModels
+    .slice(0, MAX_TREND_MODELS)
+    .map((item) => item.Model)
+  const otherTokenModels = rankedTokenModels
+    .slice(MAX_TREND_MODELS)
+    .map((item) => item.Model)
+  const tokenValues: Array<{
+    Time: string
+    Model: string
+    Tokens: number
+  }> = []
+
+  chartTimes.forEach((time) => {
+    const timeData = topTokenModels.map((model) => ({
+      Time: time,
+      Model: model,
+      Tokens: Number(timeModelMap.get(time)?.get(model)?.tokens) || 0,
+    }))
+    if (otherTokenModels.length > 0) {
+      timeData.push({
+        Time: time,
+        Model: otherLabel,
+        Tokens: otherTokenModels.reduce(
+          (sum, model) =>
+            sum + (Number(timeModelMap.get(time)?.get(model)?.tokens) || 0),
+          0
+        ),
+      })
+    }
+    tokenValues.push(...timeData)
+  })
+  tokenValues.sort((a, b) => a.Time.localeCompare(b.Time))
 
   // Rank bar: model call count ranking (top 20 + "Other" bucket)
   const MAX_RANK_MODELS = 20
@@ -652,6 +706,59 @@ export function processChartData(
       background: { fill: 'transparent' },
       animation: true,
     },
+    spec_token_bar: {
+      type: 'bar',
+      data: [{ id: 'tokenData', values: tokenValues }],
+      xField: 'Time',
+      yField: 'Tokens',
+      seriesField: 'Model',
+      stack: true,
+      legends: { visible: true, selectMode: 'single' },
+      color: modelColor,
+      bar: {
+        state: {
+          hover: { stroke: '#000', lineWidth: 1 },
+        },
+      },
+      tooltip: {
+        mark: {
+          content: [
+            {
+              key: (datum: Record<string, unknown>) => datum?.Model,
+              value: (datum: Record<string, unknown>) =>
+                formatInt(Number(datum?.Tokens) || 0),
+            },
+          ],
+        },
+        dimension: {
+          content: [
+            {
+              key: (datum: Record<string, unknown>) => datum?.Model,
+              value: (datum: Record<string, unknown>) =>
+                Number(datum?.Tokens) || 0,
+            },
+          ],
+          updateContent: (
+            array: Array<{ key: string; value: string | number }>
+          ) => {
+            array.sort(
+              (a, b) => (Number(b.value) || 0) - (Number(a.value) || 0)
+            )
+            const total = array.reduce(
+              (sum, item) => sum + (Number(item.value) || 0),
+              0
+            )
+            for (const item of array) {
+              item.value = formatInt(Number(item.value) || 0)
+            }
+            array.unshift({ key: tt('Total:'), value: formatInt(total) })
+            return array
+          },
+        },
+      },
+      background: { fill: 'transparent' },
+      animation: true,
+    },
     spec_rank_bar: {
       type: 'bar',
       data: [{ id: 'rankData', values: rankValues }],
@@ -685,6 +792,7 @@ export function processChartData(
     },
     totalQuotaDisplay: formatQuotaTotal(totalQuotaRaw),
     totalCountDisplay: formatInt(totalTimes),
+    totalTokensDisplay: formatInt(totalTokensRaw),
   }
 }
 

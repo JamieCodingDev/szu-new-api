@@ -33,6 +33,7 @@ import { Route as OauthProviderRouteImport } from './routes/oauth/$provider'
 import { Route as PricingIndexRouteImport } from './routes/pricing/index'
 import { Route as RankingsIndexRouteImport } from './routes/rankings/index'
 import { Route as SetupIndexRouteImport } from './routes/setup/index'
+import { Route as UsageGuideIndexRouteImport } from './routes/usage-guide/index'
 import { Route as authUserResetRouteImport } from './routes/(auth)/user/reset'
 import { Route as AuthenticatedChannelsIndexRouteImport } from './routes/_authenticated/channels/index'
 import { Route as AuthenticatedChatChatIdRouteImport } from './routes/_authenticated/chat/$chatId'
@@ -186,6 +187,11 @@ const RankingsIndexRoute = RankingsIndexRouteImport.update({
 const SetupIndexRoute = SetupIndexRouteImport.update({
   id: '/setup/',
   path: '/setup/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UsageGuideIndexRoute = UsageGuideIndexRouteImport.update({
+  id: '/usage-guide/',
+  path: '/usage-guide/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const authUserResetRoute = authUserResetRouteImport.update({
@@ -417,6 +423,7 @@ export interface FileRoutesByFullPath {
   '/pricing/': typeof PricingIndexRoute
   '/rankings/': typeof RankingsIndexRoute
   '/setup/': typeof SetupIndexRoute
+  '/usage-guide/': typeof UsageGuideIndexRoute
   '/user/reset': typeof authUserResetRoute
   '/chat/$chatId': typeof AuthenticatedChatChatIdRoute
   '/dashboard/$section': typeof AuthenticatedDashboardSectionRoute
@@ -475,6 +482,7 @@ export interface FileRoutesByTo {
   '/pricing': typeof PricingIndexRoute
   '/rankings': typeof RankingsIndexRoute
   '/setup': typeof SetupIndexRoute
+  '/usage-guide': typeof UsageGuideIndexRoute
   '/user/reset': typeof authUserResetRoute
   '/chat/$chatId': typeof AuthenticatedChatChatIdRoute
   '/dashboard/$section': typeof AuthenticatedDashboardSectionRoute
@@ -537,6 +545,7 @@ export interface FileRoutesById {
   '/pricing/': typeof PricingIndexRoute
   '/rankings/': typeof RankingsIndexRoute
   '/setup/': typeof SetupIndexRoute
+  '/usage-guide/': typeof UsageGuideIndexRoute
   '/(auth)/user/reset': typeof authUserResetRoute
   '/_authenticated/chat/$chatId': typeof AuthenticatedChatChatIdRoute
   '/_authenticated/dashboard/$section': typeof AuthenticatedDashboardSectionRoute
@@ -598,6 +607,7 @@ export interface FileRouteTypes {
     | '/pricing/'
     | '/rankings/'
     | '/setup/'
+    | '/usage-guide/'
     | '/user/reset'
     | '/chat/$chatId'
     | '/dashboard/$section'
@@ -656,6 +666,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/rankings'
     | '/setup'
+    | '/usage-guide'
     | '/user/reset'
     | '/chat/$chatId'
     | '/dashboard/$section'
@@ -717,6 +728,7 @@ export interface FileRouteTypes {
     | '/pricing/'
     | '/rankings/'
     | '/setup/'
+    | '/usage-guide/'
     | '/(auth)/user/reset'
     | '/_authenticated/chat/$chatId'
     | '/_authenticated/dashboard/$section'
@@ -770,6 +782,7 @@ export interface RootRouteChildren {
   PricingIndexRoute: typeof PricingIndexRoute
   RankingsIndexRoute: typeof RankingsIndexRoute
   SetupIndexRoute: typeof SetupIndexRoute
+  UsageGuideIndexRoute: typeof UsageGuideIndexRoute
   PricingModelIdIndexRoute: typeof PricingModelIdIndexRoute
 }
 
@@ -941,6 +954,13 @@ declare module '@tanstack/react-router' {
       path: '/setup'
       fullPath: '/setup/'
       preLoaderRoute: typeof SetupIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/usage-guide/': {
+      id: '/usage-guide/'
+      path: '/usage-guide'
+      fullPath: '/usage-guide/'
+      preLoaderRoute: typeof UsageGuideIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(auth)/user/reset': {
@@ -1341,6 +1361,7 @@ const rootRouteChildren: RootRouteChildren = {
   PricingIndexRoute: PricingIndexRoute,
   RankingsIndexRoute: RankingsIndexRoute,
   SetupIndexRoute: SetupIndexRoute,
+  UsageGuideIndexRoute: UsageGuideIndexRoute,
   PricingModelIdIndexRoute: PricingModelIdIndexRoute,
 }
 export const routeTree = rootRouteImport

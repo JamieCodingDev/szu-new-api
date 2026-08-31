@@ -241,9 +241,11 @@ export interface ProcessedChartData {
   spec_line: VChartSpec
   spec_area: VChartSpec
   spec_model_line: VChartSpec
+  spec_token_bar: VChartSpec
   spec_rank_bar: VChartSpec
   totalQuotaDisplay: string
   totalCountDisplay: string
+  totalTokensDisplay: string
 }
 
 export interface ProcessedUserChartData {

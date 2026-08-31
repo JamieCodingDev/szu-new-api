@@ -25,11 +25,23 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 import { ModelsFilter } from './components/models/models-filter-dialog'
 import { buildDefaultDashboardFilters, getSavedChartPreferences } from './lib'
-import type { DashboardFilters } from './types'
+import type { DashboardFilters, QuotaDataItem } from './types'
 
 const LazyLogStatCards = lazy(() =>
   import('./components/models/log-stat-cards').then((module) => ({
     default: module.LogStatCards,
+  }))
+)
+
+const LazyUsageTrendCharts = lazy(() =>
+  import('./components/models/usage-trend-charts').then((module) => ({
+    default: module.UsageTrendCharts,
+  }))
+)
+
+const LazyUsageCallDetails = lazy(() =>
+  import('./components/models/usage-call-details').then((module) => ({
+    default: module.UsageCallDetails,
   }))
 )
 
@@ -48,16 +60,39 @@ function UsageCardsFallback() {
   )
 }
 
+function UsageChartsFallback() {
+  return (
+    <div className='grid gap-4 lg:grid-cols-2'>
+      {[0, 1].map((item) => (
+        <div key={item} className='space-y-4 rounded-lg border p-4'>
+          <Skeleton className='h-5 w-36' />
+          <Skeleton className='h-[260px] w-full' />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function Dashboard() {
   const { t } = useTranslation()
   const preferences = getSavedChartPreferences()
   const [filters, setFilters] = useState<DashboardFilters>(() =>
     buildDefaultDashboardFilters(preferences)
   )
+  const [usageData, setUsageData] = useState<QuotaDataItem[]>([])
+  const [usageLoading, setUsageLoading] = useState(true)
 
   const handleReset = useCallback(() => {
     setFilters(buildDefaultDashboardFilters(preferences))
   }, [preferences])
+
+  const handleUsageDataUpdate = useCallback(
+    (data: QuotaDataItem[], loading: boolean) => {
+      setUsageData(data)
+      setUsageLoading(loading)
+    },
+    []
+  )
 
   return (
     <SectionPageLayout>
@@ -81,7 +116,24 @@ export function Dashboard() {
           </p>
           <FadeIn>
             <Suspense fallback={<UsageCardsFallback />}>
-              <LazyLogStatCards filters={filters} />
+              <LazyLogStatCards
+                filters={filters}
+                onDataUpdate={handleUsageDataUpdate}
+              />
+            </Suspense>
+          </FadeIn>
+          <FadeIn delay={0.05}>
+            <Suspense fallback={<UsageChartsFallback />}>
+              <LazyUsageTrendCharts
+                data={usageData}
+                loading={usageLoading}
+                timeGranularity={filters.time_granularity}
+              />
+            </Suspense>
+          </FadeIn>
+          <FadeIn delay={0.1}>
+            <Suspense fallback={<Skeleton className='h-80 w-full' />}>
+              <LazyUsageCallDetails filters={filters} />
             </Suspense>
           </FadeIn>
         </div>

@@ -16,20 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useTranslation } from 'react-i18next'
+import { createFileRoute } from '@tanstack/react-router'
 
-export type TopNavLink = {
-  title: string
-  href: string
-  disabled?: boolean
-  requiresAuth?: boolean
-  external?: boolean
-}
+import { UsageGuide } from '@/features/usage-guide'
 
-export function useTopNavLinks(): TopNavLink[] {
-  const { t } = useTranslation()
-  return [
-    { title: t('Usage Guide'), href: '/usage-guide' },
-    { title: t('About'), href: '/about' },
-  ]
-}
+export const Route = createFileRoute('/usage-guide/')({
+  component: UsageGuide,
+})

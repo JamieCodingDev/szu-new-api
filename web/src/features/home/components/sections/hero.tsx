@@ -22,7 +22,6 @@ import { ArrowRight, BookOpen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
-import { useStatus } from '@/hooks/use-status'
 
 import { HeroTerminalDemo } from '../hero-terminal-demo'
 
@@ -47,34 +46,16 @@ const MoreIcon = () => (
 
 export function Hero(props: HeroProps) {
   const { t } = useTranslation()
-  const { status } = useStatus()
-  const docsUrl =
-    (status?.docs_link as string | undefined) || 'https://docs.newapi.pro'
 
-  const renderDocsButton = () => {
-    const isExternal = docsUrl.startsWith('http')
-    if (isExternal) {
-      return (
-        <Button
-          variant='outline'
-          className='group border-border/50 hover:border-border hover:bg-muted/50 inline-flex h-11 items-center gap-1.5 rounded-lg px-5 text-sm font-medium'
-          render={
-            <a href={docsUrl} target='_blank' rel='noopener noreferrer' />
-          }
-        >
-          <BookOpen className='text-muted-foreground/80 group-hover:text-foreground size-4 transition-colors duration-200' />
-          <span>{t('Docs')}</span>
-        </Button>
-      )
-    }
+  const renderUsageGuideButton = () => {
     return (
       <Button
         variant='outline'
         className='group border-border/50 hover:border-border hover:bg-muted/50 inline-flex h-11 items-center gap-1.5 rounded-lg px-5 text-sm font-medium'
-        render={<Link to={docsUrl} />}
+        render={<Link to='/usage-guide' />}
       >
         <BookOpen className='text-muted-foreground/80 group-hover:text-foreground size-4 transition-colors duration-200' />
-        <span>{t('Docs')}</span>
+        <span>{t('Usage Guide')}</span>
       </Button>
     )
   }
@@ -143,21 +124,21 @@ export function Hero(props: HeroProps) {
                   className='group h-11 rounded-lg px-5 text-sm font-medium'
                   render={<Link to='/dashboard' />}
                 >
-                  {t('Go to Dashboard')}
+                  {t('Get Started')}
                   <ArrowRight className='ml-1.5 size-4 transition-transform duration-200 group-hover:translate-x-0.5' />
                 </Button>
-                {renderDocsButton()}
+                {renderUsageGuideButton()}
               </>
             ) : (
               <>
                 <Button
                   className='group h-11 rounded-lg px-5 text-sm font-medium'
-                  render={<Link to='/sign-up' />}
+                  render={<Link to='/sign-in' />}
                 >
                   {t('Get Started')}
                   <ArrowRight className='ml-1.5 size-4 transition-transform duration-200 group-hover:translate-x-0.5' />
                 </Button>
-                {renderDocsButton()}
+                {renderUsageGuideButton()}
               </>
             )}
           </div>

@@ -45,6 +45,15 @@ export function About() {
             </a>
             . {t('This secondary development follows the original license.')}
           </p>
+          <p className='text-muted-foreground leading-7'>
+            {t('Secondary development author email')}:{' '}
+            <a
+              href='mailto:2510103047@mails.szu.edu.cn'
+              className='text-primary font-medium hover:underline'
+            >
+              2510103047@mails.szu.edu.cn
+            </a>
+          </p>
         </div>
       </div>
     </PublicLayout>

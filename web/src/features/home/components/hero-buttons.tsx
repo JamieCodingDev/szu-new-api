@@ -34,7 +34,7 @@ export function HeroButtons({ isAuthenticated }: HeroButtonsProps) {
   if (isAuthenticated) {
     return (
       <Button size='lg' render={<Link to='/dashboard' />}>
-        {t('Go to Dashboard')} <ArrowRight className='ml-2 h-5 w-5' />
+        {t('Get Started')} <ArrowRight className='ml-2 h-5 w-5' />
       </Button>
     )
   }

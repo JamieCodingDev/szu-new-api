@@ -154,7 +154,7 @@ export function useUsersColumns(): ColumnDef<User>[] {
     {
       id: 'quota',
       accessorKey: 'quota',
-      header: t('Redemption Quota'),
+      header: t('Current Available Quota'),
       cell: ({ row }) => {
         const user = row.original
         return (

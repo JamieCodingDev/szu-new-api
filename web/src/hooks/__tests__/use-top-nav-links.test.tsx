@@ -35,11 +35,14 @@ function TranslationProvider(props: { children: ReactNode }) {
 }
 
 describe('minimal top navigation', () => {
-  test('keeps only the about entry', () => {
+  test('places the usage guide immediately before the about entry', () => {
     const { result } = renderHook(() => useTopNavLinks(), {
       wrapper: TranslationProvider,
     })
 
-    expect(result.current).toEqual([{ title: 'About', href: '/about' }])
+    expect(result.current).toEqual([
+      { title: 'Usage Guide', href: '/usage-guide' },
+      { title: 'About', href: '/about' },
+    ])
   })
 })
