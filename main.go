@@ -355,6 +355,9 @@ func InitResources() error {
 	if err != nil {
 		return err
 	}
+	if err = model.InvalidateSZUUserQuotaCachesAfterRedisInit(); err != nil {
+		return err
+	}
 
 	perfmetrics.Init()
 

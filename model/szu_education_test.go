@@ -50,6 +50,37 @@ func TestSZUMonthlyQuotaAccumulatesAndNeverResets(t *testing.T) {
 	assert.Equal(t, "2026-10", grants[1].GrantMonth)
 }
 
+func TestSZUStartupGrantInvalidatesStaleRedisWalletCache(t *testing.T) {
+	truncateTables(t)
+	useUserCacheMiniRedis(t)
+
+	user := User{
+		Username:    "startup-cache-user",
+		Password:    "password",
+		AffCode:     "startup-cache-aff",
+		Status:      common.UserStatusEnabled,
+		Role:        common.RoleCommonUser,
+		AccountType: AccountTypeStudent,
+	}
+	require.NoError(t, DB.Create(&user).Error)
+	require.NoError(t, populateUserCache(user))
+
+	grantAt := time.Date(2026, time.September, 1, 0, 0, 0, 0, szuQuotaLocation).Unix()
+	require.NoError(t, DB.Transaction(func(tx *gorm.DB) error {
+		_, err := grantSZUMonthlyQuotaForUserWithTx(tx, user.Id, grantAt)
+		return err
+	}))
+
+	staleQuota, err := getUserQuotaCache(user.Id)
+	require.NoError(t, err)
+	assert.Zero(t, staleQuota)
+
+	require.NoError(t, InvalidateSZUUserQuotaCachesAfterRedisInit())
+	refreshedQuota, err := GetUserQuota(user.Id, false)
+	require.NoError(t, err)
+	assert.Equal(t, SZUMonthlyQuotaForUser(&user), refreshedQuota)
+}
+
 func TestSZUQuotaLedgerCombinesMonthlyAndRedemptionIncome(t *testing.T) {
 	truncateTables(t)
 	user := User{

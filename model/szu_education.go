@@ -373,6 +373,27 @@ func GrantCurrentSZUMonthlyQuota() (int, error) {
 	return len(credits), nil
 }
 
+// InvalidateSZUUserQuotaCachesAfterRedisInit removes user wallet snapshots
+// that may predate startup monthly grants. Database migration runs before the
+// Redis client is initialized, so the grant ledger and wallet can commit while
+// an old Redis hash still contains the previous balance. The next read safely
+// hydrates each invalidated user from the database-authoritative wallet.
+func InvalidateSZUUserQuotaCachesAfterRedisInit() error {
+	if !common.SZUQuotaOnlyMode || !common.RedisEnabled || common.RDB == nil {
+		return nil
+	}
+	var userIds []int
+	if err := DB.Model(&User{}).Pluck("id", &userIds).Error; err != nil {
+		return err
+	}
+	for _, userId := range userIds {
+		if err := invalidateUserCache(userId); err != nil {
+			return fmt.Errorf("invalidate user %d quota cache: %w", userId, err)
+		}
+	}
+	return nil
+}
+
 // EnsureSZUMonthlyQuotaGrants migrates the previous subscription-based
 // implementation without deleting any balance. Legacy automatic
 // subscriptions are cancelled so they can no longer reset or spend a second

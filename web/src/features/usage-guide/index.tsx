@@ -57,7 +57,7 @@ const OPENCODE_CONFIG = `{
         "deepseek-v4-flash": {
           "name": "DeepSeek V4 Flash",
           "limit": {
-            "context": 262144,
+            "context": 131072,
             "output": 32768
           }
         }
@@ -66,23 +66,84 @@ const OPENCODE_CONFIG = `{
   }
 }`
 
-const CODEX_CONFIG = `model_provider = "szu"
+const CODEX_CONFIG = `model_provider = "szu_new_api"
 model = "deepseek-v4-flash"
+model_context_window = 131072
+model_auto_compact_token_limit = 114688
+model_supports_reasoning_summaries = false
+model_reasoning_summary = "none"
+disable_response_storage = true
 
-[model_providers.szu]
+[model_providers.szu_new_api]
 name = "SZU New API"
 base_url = "http://172.31.233.175:3000/v1"
 env_key = "SZU_NEW_API_KEY"
-wire_api = "responses"`
+wire_api = "responses"
+requires_openai_auth = false`
 
-const CODEX_WINDOWS_KEY = `[Environment]::SetEnvironmentVariable(
-  "SZU_NEW_API_KEY",
-  "sk-替换为你的 API 密钥",
-  "User"
-)`
+const CODEX_WINDOWS_KEY = `$SzuApiKey = Read-Host '请输入完整 New API Token'
+[Environment]::SetEnvironmentVariable('SZU_NEW_API_KEY', $SzuApiKey, 'User')
+$env:SZU_NEW_API_KEY = $SzuApiKey
+"Token 长度：$($env:SZU_NEW_API_KEY.Length)"`
 
-const CODEX_UNIX_KEY = `echo 'export SZU_NEW_API_KEY="sk-替换为你的 API 密钥"' >> ~/.bashrc
-source ~/.bashrc`
+const CODEX_UNIX_KEY = `mkdir -p "$HOME/.codex"
+chmod 700 "$HOME/.codex"
+umask 077
+read -rsp '请输入完整 New API Token：' SZU_NEW_API_KEY
+printf '\n'
+export SZU_NEW_API_KEY
+printf 'export SZU_NEW_API_KEY=%q\n' "$SZU_NEW_API_KEY" > "$HOME/.codex/szu-new-api-key.env"
+grep -qxF '. "$HOME/.codex/szu-new-api-key.env"' "$HOME/.bashrc" || \\
+  printf '%s\n' '. "$HOME/.codex/szu-new-api-key.env"' >> "$HOME/.bashrc"
+printf 'Token 长度：%s\n' "\${#SZU_NEW_API_KEY}"`
+
+const CODEX_VERIFY_MODELS = `curl --noproxy '*' -sS \\
+  http://172.31.233.175:3000/v1/models \\
+  -H "Authorization: Bearer \${SZU_NEW_API_KEY}"`
+
+const CODEX_VERIFY_RESPONSES = `curl --noproxy '*' -sS \\
+  http://172.31.233.175:3000/v1/responses \\
+  -H "Authorization: Bearer \${SZU_NEW_API_KEY}" \\
+  -H 'Content-Type: application/json' \\
+  -d '{
+    "model": "deepseek-v4-flash",
+    "input": [{
+      "role": "user",
+      "content": [{"type": "input_text", "text": "只回复 OK"}]
+    }],
+    "stream": false,
+    "store": false
+  }'`
+
+const CODEX_VERIFY_WINDOWS = `$Headers = @{ Authorization = "Bearer $env:SZU_NEW_API_KEY" }
+Invoke-RestMethod -Uri 'http://172.31.233.175:3000/v1/models' -Headers $Headers
+
+$Body = @{
+  model = 'deepseek-v4-flash'
+  input = @(@{
+    role = 'user'
+    content = @(@{ type = 'input_text'; text = '只回复 OK' })
+  })
+  stream = $false
+  store = $false
+} | ConvertTo-Json -Depth 6
+
+Invoke-RestMethod -Method Post -Uri 'http://172.31.233.175:3000/v1/responses' -Headers $Headers -ContentType 'application/json' -Body $Body`
+
+const CODEX_TROUBLESHOOTING = `# 401 Invalid token / Token 长度为 0
+# Linux / macOS：重新加载密钥；Windows：重开 PowerShell
+. "$HOME/.codex/szu-new-api-key.env"
+printf 'Token 长度：%s\n' "\${#SZU_NEW_API_KEY}"
+
+# item['content'] is not an array
+# 服务端版本过旧；部署包含 Codex Responses 转换修复的版本（a2be87e9 或更新）。
+
+# Model metadata ... not found
+# 自定义模型没有内置元数据时的提示；本配置已显式声明 131072 上下文，并非鉴权失败。
+
+# Reconnecting / high demand
+# 先执行上面的 /v1/models 与 /v1/responses 验证；均成功后升级 Codex 并新建会话。
+npm install -g @openai/codex`
 
 interface CodeBlockProps {
   code: string
@@ -354,15 +415,34 @@ export function UsageGuide() {
               </p>
               <CodeBlock code={CODEX_CONFIG} label='config.toml' />
             </GuideStep>
-            <GuideStep number={4} title={t('Start')}>
+            <GuideStep number={4} title={t('Verify Setup')}>
               <p>
                 {t(
                   'Because the provider and model are already defaults, codex is enough. The explicit model command is also available.'
                 )}
               </p>
               <CodeBlock
-                code={'codex\n# or\ncodex --model deepseek-v4-flash'}
+                code={CODEX_VERIFY_MODELS}
+                label='Linux / macOS：验证 API Key'
               />
+              <CodeBlock
+                code={CODEX_VERIFY_RESPONSES}
+                label='Linux / macOS：验证 Responses API'
+              />
+              <CodeBlock
+                code={CODEX_VERIFY_WINDOWS}
+                label='Windows PowerShell：验证 API Key 与 Responses API'
+              />
+            </GuideStep>
+            <GuideStep number={5} title={t('Start')}>
+              <CodeBlock
+                code={
+                  'codex --version\n# Update when needed: npm install -g @openai/codex\ncodex\n# or\ncodex --model deepseek-v4-flash'
+                }
+              />
+            </GuideStep>
+            <GuideStep number={6} title={t('FAQ')}>
+              <CodeBlock code={CODEX_TROUBLESHOOTING} />
             </GuideStep>
           </ProviderGuide>
 
