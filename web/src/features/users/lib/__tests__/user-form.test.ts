@@ -64,6 +64,27 @@ describe('administrator-provisioned business role mapping', () => {
     expect(payload.managed_role).toBe('teacher')
   })
 
+  test('graduate student role survives edit form round trips', () => {
+    const user: User = {
+      id: 8,
+      username: 'graduate-user',
+      display_name: 'Graduate User',
+      quota: 0,
+      used_quota: 0,
+      request_count: 0,
+      status: 1,
+      role: 1,
+      account_type: 'graduate',
+      managed_role: 'graduate',
+    }
+
+    const defaults = transformUserToFormDefaults(user)
+    const payload = transformFormDataToPayload(defaults, user.id)
+
+    expect(defaults.managed_role).toBe('graduate')
+    expect(payload.managed_role).toBe('graduate')
+  })
+
   test('unknown business roles are rejected by the form schema', () => {
     const result = userFormSchema.safeParse({
       ...USER_FORM_DEFAULT_VALUES,

@@ -14,6 +14,7 @@ import (
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	hosttypes "github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
@@ -21,6 +22,38 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestCalculateTextQuotaSummaryUsesDeepSeekTenTimesOutputBilling(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ratio_setting.InitRatioSettings()
+	modelRatio, found, _ := ratio_setting.GetModelRatio("deepseek-v4-flash")
+	require.True(t, found)
+
+	relayInfo := &relaycommon.RelayInfo{
+		OriginModelName: "deepseek-v4-flash",
+		PriceData: hosttypes.PriceData{
+			ModelRatio:      modelRatio,
+			CompletionRatio: ratio_setting.GetCompletionRatio("deepseek-v4-flash"),
+			CacheRatio:      1,
+			ImageRatio:      1,
+			GroupRatioInfo: hosttypes.GroupRatioInfo{
+				GroupRatio: 1,
+			},
+		},
+		StartTime: time.Now(),
+	}
+	usage := &dto.Usage{
+		PromptTokens:     123,
+		CompletionTokens: 45,
+		TotalTokens:      168,
+	}
+
+	summary := calculateTextQuotaSummary(ctx, relayInfo, usage)
+
+	assert.Equal(t, 10.0, summary.CompletionRatio)
+	assert.Equal(t, 123+10*45, summary.Quota)
+}
 
 func TestCalculateTextQuotaSummaryUnifiedForClaudeSemantic(t *testing.T) {
 	gin.SetMode(gin.TestMode)

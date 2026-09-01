@@ -39,7 +39,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 
-const SERVICE_URL = 'http://172.31.233.175:3000'
+const SERVICE_URL = 'https://llm.snrc.site'
 const OPENAI_BASE_URL = `${SERVICE_URL}/v1`
 const MODEL_ID = 'deepseek-v4-flash'
 
@@ -51,7 +51,7 @@ const OPENCODE_CONFIG = `{
       "npm": "@ai-sdk/openai-compatible",
       "name": "SZU New API",
       "options": {
-        "baseURL": "http://172.31.233.175:3000/v1"
+        "baseURL": "https://llm.snrc.site/v1"
       },
       "models": {
         "deepseek-v4-flash": {
@@ -76,7 +76,7 @@ disable_response_storage = true
 
 [model_providers.szu_new_api]
 name = "SZU New API"
-base_url = "http://172.31.233.175:3000/v1"
+base_url = "https://llm.snrc.site/v1"
 env_key = "SZU_NEW_API_KEY"
 wire_api = "responses"
 requires_openai_auth = false`
@@ -98,11 +98,11 @@ grep -qxF '. "$HOME/.codex/szu-new-api-key.env"' "$HOME/.bashrc" || \\
 printf 'Token 长度：%s\n' "\${#SZU_NEW_API_KEY}"`
 
 const CODEX_VERIFY_MODELS = `curl --noproxy '*' -sS \\
-  http://172.31.233.175:3000/v1/models \\
+  https://llm.snrc.site/v1/models \\
   -H "Authorization: Bearer \${SZU_NEW_API_KEY}"`
 
 const CODEX_VERIFY_RESPONSES = `curl --noproxy '*' -sS \\
-  http://172.31.233.175:3000/v1/responses \\
+  https://llm.snrc.site/v1/responses \\
   -H "Authorization: Bearer \${SZU_NEW_API_KEY}" \\
   -H 'Content-Type: application/json' \\
   -d '{
@@ -116,7 +116,7 @@ const CODEX_VERIFY_RESPONSES = `curl --noproxy '*' -sS \\
   }'`
 
 const CODEX_VERIFY_WINDOWS = `$Headers = @{ Authorization = "Bearer $env:SZU_NEW_API_KEY" }
-Invoke-RestMethod -Uri 'http://172.31.233.175:3000/v1/models' -Headers $Headers
+Invoke-RestMethod -Uri 'https://llm.snrc.site/v1/models' -Headers $Headers
 
 $Body = @{
   model = 'deepseek-v4-flash'
@@ -128,7 +128,7 @@ $Body = @{
   store = $false
 } | ConvertTo-Json -Depth 6
 
-Invoke-RestMethod -Method Post -Uri 'http://172.31.233.175:3000/v1/responses' -Headers $Headers -ContentType 'application/json' -Body $Body`
+Invoke-RestMethod -Method Post -Uri 'https://llm.snrc.site/v1/responses' -Headers $Headers -ContentType 'application/json' -Body $Body`
 
 const CODEX_TROUBLESHOOTING = `# 401 Invalid token / Token 长度为 0
 # Linux / macOS：重新加载密钥；Windows：重开 PowerShell
@@ -463,6 +463,11 @@ export function UsageGuide() {
                   'Create a Claude provider and fill in the following values. Enable Full URL for the request address.'
                 )}
               </p>
+              <p>
+                {t(
+                  'Expand Advanced options and set API format to the all-English option OpenAI Chat Completions (Requires Routing). This option works only when local routing is enabled.'
+                )}
+              </p>
               <SettingsList
                 items={[
                   {
@@ -479,7 +484,7 @@ export function UsageGuide() {
                   },
                   {
                     label: t('API format'),
-                    value: t('OpenAI Chat Completions'),
+                    value: 'OpenAI Chat Completions (Requires Routing)',
                   },
                   {
                     label: t('Authentication field'),
@@ -506,12 +511,12 @@ export function UsageGuide() {
             <GuideStep number={4} title={t('Enable routing and start')}>
               <p>
                 {t(
-                  'In CC Switch, enable the local routing master switch and the Claude route. Keep CC Switch running while using Claude Code.'
+                  'Open Settings > Routing, turn on the routing master switch, enable the Claude route, and confirm the service address is http://127.0.0.1:15721. Restart the routing service after changing its address or port, and keep CC Switch running while using Claude Code.'
                 )}
               </p>
               <CodeBlock
                 code={
-                  '# Local routing service\nhttp://127.0.0.1:15721\n\nclaude --model sonnet'
+                  '# CC Switch > Settings > Routing\nRouting master switch: ON\nClaude route: ON\nService address: http://127.0.0.1:15721\n\nclaude --model sonnet'
                 }
               />
             </GuideStep>

@@ -72,9 +72,10 @@ func TestMonthlyQuotaDefaultsManagement(t *testing.T) {
 	previousOptionMap := common.OptionMap
 	common.OptionMapRWMutex.Lock()
 	common.OptionMap = map[string]string{
-		model.SZUStudentMonthlyQuotaOptionKey: fmt.Sprint(model.SZUStudentMonthlyQuota),
-		model.SZUTeacherMonthlyQuotaOptionKey: fmt.Sprint(model.SZUTeacherMonthlyQuota),
-		model.SZUAdminMonthlyQuotaOptionKey:   fmt.Sprint(model.SZUAdminMonthlyQuota),
+		model.SZUStudentMonthlyQuotaOptionKey:  fmt.Sprint(model.SZUStudentMonthlyQuota),
+		model.SZUGraduateMonthlyQuotaOptionKey: fmt.Sprint(model.SZUGraduateMonthlyQuota),
+		model.SZUTeacherMonthlyQuotaOptionKey:  fmt.Sprint(model.SZUTeacherMonthlyQuota),
+		model.SZUAdminMonthlyQuotaOptionKey:    fmt.Sprint(model.SZUAdminMonthlyQuota),
 	}
 	common.OptionMapRWMutex.Unlock()
 	t.Cleanup(func() {
@@ -83,20 +84,21 @@ func TestMonthlyQuotaDefaultsManagement(t *testing.T) {
 		common.OptionMapRWMutex.Unlock()
 	})
 
-	recorder := performMonthlyQuotaDefaultsRequest(t, http.MethodPut, `{"student":150000,"teacher":300000,"admin":1500000}`)
+	recorder := performMonthlyQuotaDefaultsRequest(t, http.MethodPut, `{"student":150000,"graduate":250000,"teacher":300000,"admin":1500000}`)
 	assert.Equal(t, http.StatusOK, recorder.Code)
 	assert.Contains(t, recorder.Body.String(), `"success":true`)
 	assert.Contains(t, recorder.Body.String(), `"student":150000`)
 	assert.Equal(t, 150_000, model.SZUMonthlyQuotaForUser(&model.User{Role: common.RoleCommonUser, AccountType: model.AccountTypeStudent}))
+	assert.Equal(t, 250_000, model.SZUMonthlyQuotaForUser(&model.User{Role: common.RoleCommonUser, AccountType: model.AccountTypeGraduate}))
 
 	var options []model.Option
 	require.NoError(t, db.Order("key").Find(&options).Error)
-	assert.Len(t, options, 3)
+	assert.Len(t, options, 4)
 
 	recorder = performMonthlyQuotaDefaultsRequest(t, http.MethodGet, "")
 	assert.Contains(t, recorder.Body.String(), `"teacher":300000`)
 
-	recorder = performMonthlyQuotaDefaultsRequest(t, http.MethodPut, `{"student":0,"teacher":300000,"admin":1500000}`)
+	recorder = performMonthlyQuotaDefaultsRequest(t, http.MethodPut, `{"student":0,"graduate":250000,"teacher":300000,"admin":1500000}`)
 	assert.Contains(t, recorder.Body.String(), `"success":false`)
 	assert.Equal(t, 150_000, model.GetSZUMonthlyQuotaDefaults().Student)
 }
@@ -322,6 +324,32 @@ func TestCreateManagedUserUsesOneIdentifierAndOneBusinessRole(t *testing.T) {
 	assert.Equal(t, common.RoleCommonUser, created.Role)
 	assert.Equal(t, model.AccountTypeTeacher, created.AccountType)
 	assert.Equal(t, model.ManagedRoleTeacher, model.ManagedRoleForUser(&created))
+}
+
+func TestCreateManagedGraduateStudentUsesIndependentBusinessRole(t *testing.T) {
+	db := setupManageUserTestDB(t)
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/user/", strings.NewReader(`{
+		"username":"graduate-user",
+		"password":"password123",
+		"managed_role":"graduate"
+	}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("id", 9999)
+	c.Set("role", common.RoleAdminUser)
+	c.Set("username", "admin-operator")
+
+	CreateUser(c)
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), `"success":true`)
+
+	var created model.User
+	require.NoError(t, db.Where("username = ?", "graduate-user").First(&created).Error)
+	assert.Equal(t, common.RoleCommonUser, created.Role)
+	assert.Equal(t, model.AccountTypeGraduate, created.AccountType)
+	assert.Equal(t, model.ManagedRoleGraduate, model.ManagedRoleForUser(&created))
 }
 
 func TestUpdateManagedUserSynchronizesAdministratorRoleAndIdentity(t *testing.T) {

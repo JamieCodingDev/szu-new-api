@@ -15,21 +15,25 @@ import (
 )
 
 const (
-	AccountTypeStudent = "student"
-	AccountTypeTeacher = "teacher"
-	ManagedRoleAdmin   = "admin"
-	ManagedRoleTeacher = "teacher"
-	ManagedRoleStudent = "student"
+	AccountTypeStudent  = "student"
+	AccountTypeGraduate = "graduate"
+	AccountTypeTeacher  = "teacher"
+	ManagedRoleAdmin    = "admin"
+	ManagedRoleTeacher  = "teacher"
+	ManagedRoleGraduate = "graduate"
+	ManagedRoleStudent  = "student"
 
 	// Monthly grants are credited to the ordinary user wallet. Unused quota
 	// automatically rolls over and redemption credits use the same balance.
-	SZUStudentMonthlyQuota = 100_000
-	SZUTeacherMonthlyQuota = 200_000
-	SZUAdminMonthlyQuota   = 1_000_000
+	SZUStudentMonthlyQuota  = 100_000
+	SZUGraduateMonthlyQuota = SZUStudentMonthlyQuota
+	SZUTeacherMonthlyQuota  = 200_000
+	SZUAdminMonthlyQuota    = 1_000_000
 
-	SZUStudentMonthlyQuotaOptionKey = "SZUStudentMonthlyQuota"
-	SZUTeacherMonthlyQuotaOptionKey = "SZUTeacherMonthlyQuota"
-	SZUAdminMonthlyQuotaOptionKey   = "SZUAdminMonthlyQuota"
+	SZUStudentMonthlyQuotaOptionKey  = "SZUStudentMonthlyQuota"
+	SZUGraduateMonthlyQuotaOptionKey = "SZUGraduateMonthlyQuota"
+	SZUTeacherMonthlyQuotaOptionKey  = "SZUTeacherMonthlyQuota"
+	SZUAdminMonthlyQuotaOptionKey    = "SZUAdminMonthlyQuota"
 
 	// Kept for compatibility with callers that use the old student-default
 	// constant. New code should use SZUMonthlyQuotaForUser.
@@ -64,16 +68,18 @@ type SZUQuotaLedgerEntry struct {
 // values are stored in the options table so administrators can change the
 // policy without rebuilding or restarting the service.
 type SZUMonthlyQuotaDefaults struct {
-	Student int `json:"student"`
-	Teacher int `json:"teacher"`
-	Admin   int `json:"admin"`
+	Student  int `json:"student"`
+	Graduate int `json:"graduate"`
+	Teacher  int `json:"teacher"`
+	Admin    int `json:"admin"`
 }
 
 func defaultSZUMonthlyQuotaDefaults() SZUMonthlyQuotaDefaults {
 	return SZUMonthlyQuotaDefaults{
-		Student: SZUStudentMonthlyQuota,
-		Teacher: SZUTeacherMonthlyQuota,
-		Admin:   SZUAdminMonthlyQuota,
+		Student:  SZUStudentMonthlyQuota,
+		Graduate: SZUGraduateMonthlyQuota,
+		Teacher:  SZUTeacherMonthlyQuota,
+		Admin:    SZUAdminMonthlyQuota,
 	}
 }
 
@@ -96,6 +102,7 @@ func configuredSZUMonthlyQuota(optionKey string, fallback int) int {
 func loadSZUMonthlyQuotaDefaultsFromDatabase() error {
 	keys := []string{
 		SZUStudentMonthlyQuotaOptionKey,
+		SZUGraduateMonthlyQuotaOptionKey,
 		SZUTeacherMonthlyQuotaOptionKey,
 		SZUAdminMonthlyQuotaOptionKey,
 	}
@@ -125,17 +132,19 @@ func querySZUMonthlyQuotaOptions(db *gorm.DB, options *[]Option, keys []string) 
 func GetSZUMonthlyQuotaDefaults() SZUMonthlyQuotaDefaults {
 	fallback := defaultSZUMonthlyQuotaDefaults()
 	return SZUMonthlyQuotaDefaults{
-		Student: configuredSZUMonthlyQuota(SZUStudentMonthlyQuotaOptionKey, fallback.Student),
-		Teacher: configuredSZUMonthlyQuota(SZUTeacherMonthlyQuotaOptionKey, fallback.Teacher),
-		Admin:   configuredSZUMonthlyQuota(SZUAdminMonthlyQuotaOptionKey, fallback.Admin),
+		Student:  configuredSZUMonthlyQuota(SZUStudentMonthlyQuotaOptionKey, fallback.Student),
+		Graduate: configuredSZUMonthlyQuota(SZUGraduateMonthlyQuotaOptionKey, fallback.Graduate),
+		Teacher:  configuredSZUMonthlyQuota(SZUTeacherMonthlyQuotaOptionKey, fallback.Teacher),
+		Admin:    configuredSZUMonthlyQuota(SZUAdminMonthlyQuotaOptionKey, fallback.Admin),
 	}
 }
 
 func ValidateSZUMonthlyQuotaDefaults(defaults SZUMonthlyQuotaDefaults) error {
 	for role, quota := range map[string]int{
-		ManagedRoleStudent: defaults.Student,
-		ManagedRoleTeacher: defaults.Teacher,
-		ManagedRoleAdmin:   defaults.Admin,
+		ManagedRoleStudent:  defaults.Student,
+		ManagedRoleGraduate: defaults.Graduate,
+		ManagedRoleTeacher:  defaults.Teacher,
+		ManagedRoleAdmin:    defaults.Admin,
 	} {
 		if quota <= 0 || quota > common.MaxWalletQuota {
 			return fmt.Errorf("%s monthly quota must be between 1 and %d", role, common.MaxWalletQuota)
@@ -144,24 +153,29 @@ func ValidateSZUMonthlyQuotaDefaults(defaults SZUMonthlyQuotaDefaults) error {
 	return nil
 }
 
-// UpdateSZUMonthlyQuotaDefaults atomically persists all three role values and
+// UpdateSZUMonthlyQuotaDefaults atomically persists all role values and
 // updates the in-memory option cache after the database transaction commits.
 func UpdateSZUMonthlyQuotaDefaults(defaults SZUMonthlyQuotaDefaults) error {
 	if err := ValidateSZUMonthlyQuotaDefaults(defaults); err != nil {
 		return err
 	}
 	return UpdateOptionsBulk(map[string]string{
-		SZUStudentMonthlyQuotaOptionKey: strconv.Itoa(defaults.Student),
-		SZUTeacherMonthlyQuotaOptionKey: strconv.Itoa(defaults.Teacher),
-		SZUAdminMonthlyQuotaOptionKey:   strconv.Itoa(defaults.Admin),
+		SZUStudentMonthlyQuotaOptionKey:  strconv.Itoa(defaults.Student),
+		SZUGraduateMonthlyQuotaOptionKey: strconv.Itoa(defaults.Graduate),
+		SZUTeacherMonthlyQuotaOptionKey:  strconv.Itoa(defaults.Teacher),
+		SZUAdminMonthlyQuotaOptionKey:    strconv.Itoa(defaults.Admin),
 	})
 }
 
 func NormalizeAccountType(accountType string) string {
-	if strings.EqualFold(strings.TrimSpace(accountType), AccountTypeTeacher) {
+	switch strings.ToLower(strings.TrimSpace(accountType)) {
+	case AccountTypeTeacher:
 		return AccountTypeTeacher
+	case AccountTypeGraduate:
+		return AccountTypeGraduate
+	default:
+		return AccountTypeStudent
 	}
-	return AccountTypeStudent
 }
 
 func ParseManagedRole(value string) (string, bool) {
@@ -170,6 +184,8 @@ func ParseManagedRole(value string) (string, bool) {
 		return ManagedRoleAdmin, true
 	case ManagedRoleTeacher:
 		return ManagedRoleTeacher, true
+	case ManagedRoleGraduate:
+		return ManagedRoleGraduate, true
 	case ManagedRoleStudent:
 		return ManagedRoleStudent, true
 	default:
@@ -186,6 +202,9 @@ func ManagedRoleForUser(user *User) string {
 	if user != nil && NormalizeAccountType(user.AccountType) == AccountTypeTeacher {
 		return ManagedRoleTeacher
 	}
+	if user != nil && NormalizeAccountType(user.AccountType) == AccountTypeGraduate {
+		return ManagedRoleGraduate
+	}
 	return ManagedRoleStudent
 }
 
@@ -197,6 +216,8 @@ func SZUMonthlyQuotaForUser(user *User) int {
 		return defaults.Admin
 	case ManagedRoleTeacher:
 		return defaults.Teacher
+	case ManagedRoleGraduate:
+		return defaults.Graduate
 	default:
 		return defaults.Student
 	}
@@ -204,7 +225,7 @@ func SZUMonthlyQuotaForUser(user *User) int {
 
 // ApplyManagedRole keeps the legacy role/account_type columns synchronized.
 // Root is handled by the update controller so the built-in account can never
-// be demoted through the three-option management form.
+// be demoted through the managed-role form.
 func ApplyManagedRole(user *User, value string) error {
 	if user == nil {
 		return errors.New("user is required")
@@ -221,6 +242,9 @@ func ApplyManagedRole(user *User, value string) error {
 	case ManagedRoleTeacher:
 		user.Role = common.RoleCommonUser
 		user.AccountType = AccountTypeTeacher
+	case ManagedRoleGraduate:
+		user.Role = common.RoleCommonUser
+		user.AccountType = AccountTypeGraduate
 	case ManagedRoleStudent:
 		user.Role = common.RoleCommonUser
 		user.AccountType = AccountTypeStudent
@@ -421,7 +445,7 @@ func EnsureSZUMonthlyQuotaGrants() error {
 			return err
 		}
 		if err := tx.Model(&User{}).
-			Where("role < ? AND (account_type IS NULL OR account_type NOT IN ?)", common.RoleAdminUser, []string{AccountTypeStudent, AccountTypeTeacher}).
+			Where("role < ? AND (account_type IS NULL OR account_type NOT IN ?)", common.RoleAdminUser, []string{AccountTypeStudent, AccountTypeGraduate, AccountTypeTeacher}).
 			Update("account_type", AccountTypeStudent).Error; err != nil {
 			return err
 		}

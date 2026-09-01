@@ -56,7 +56,12 @@ describe('monthly quota defaults dialog', () => {
     apiClient.get = async () => ({
       data: {
         success: true,
-        data: { student: 100000, teacher: 200000, admin: 1000000 },
+        data: {
+          student: 100000,
+          graduate: 100000,
+          teacher: 200000,
+          admin: 1000000,
+        },
       },
     })
     apiClient.put = async (_url, data) => {
@@ -84,6 +89,7 @@ describe('monthly quota defaults dialog', () => {
     await waitFor(() => {
       expect(submitted).toEqual({
         student: 120000,
+        graduate: 100000,
         teacher: 200000,
         admin: 1000000,
       })

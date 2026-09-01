@@ -32,10 +32,15 @@ export type UserStatus = z.infer<typeof userStatusSchema>
 export const userRoleSchema = z.number()
 export type UserRole = z.infer<typeof userRoleSchema>
 
-export const accountTypeSchema = z.enum(['student', 'teacher'])
+export const accountTypeSchema = z.enum(['student', 'graduate', 'teacher'])
 export type AccountType = z.infer<typeof accountTypeSchema>
 
-export const managedRoleSchema = z.enum(['admin', 'teacher', 'student'])
+export const managedRoleSchema = z.enum([
+  'admin',
+  'teacher',
+  'graduate',
+  'student',
+])
 export type ManagedRole = z.infer<typeof managedRoleSchema>
 
 export const userSchema = z.object({
@@ -145,6 +150,7 @@ export interface ManageUserQuotaPayload {
 
 export interface MonthlyQuotaDefaults {
   student: number
+  graduate: number
   teacher: number
   admin: number
 }

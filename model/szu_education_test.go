@@ -243,6 +243,7 @@ func TestManagedRoleMappingKeepsAuthorizationAndAccountTypeConsistent(t *testing
 	}{
 		{name: "administrator", managedRole: ManagedRoleAdmin, role: common.RoleAdminUser, accountType: AccountTypeTeacher, monthlyQuota: SZUAdminMonthlyQuota},
 		{name: "teacher", managedRole: ManagedRoleTeacher, role: common.RoleCommonUser, accountType: AccountTypeTeacher, monthlyQuota: SZUTeacherMonthlyQuota},
+		{name: "graduate student", managedRole: ManagedRoleGraduate, role: common.RoleCommonUser, accountType: AccountTypeGraduate, monthlyQuota: SZUGraduateMonthlyQuota},
 		{name: "student", managedRole: ManagedRoleStudent, role: common.RoleCommonUser, accountType: AccountTypeStudent, monthlyQuota: SZUStudentMonthlyQuota},
 	}
 
@@ -260,12 +261,14 @@ func TestManagedRoleMappingKeepsAuthorizationAndAccountTypeConsistent(t *testing
 
 func TestSZUMonthlyQuotaDefaultsAreDatabaseBacked(t *testing.T) {
 	custom := SZUMonthlyQuotaDefaults{
-		Student: 150_000,
-		Teacher: 300_000,
-		Admin:   1_500_000,
+		Student:  150_000,
+		Graduate: 250_000,
+		Teacher:  300_000,
+		Admin:    1_500_000,
 	}
 	keys := []string{
 		SZUStudentMonthlyQuotaOptionKey,
+		SZUGraduateMonthlyQuotaOptionKey,
 		SZUTeacherMonthlyQuotaOptionKey,
 		SZUAdminMonthlyQuotaOptionKey,
 	}
@@ -296,12 +299,13 @@ func TestSZUMonthlyQuotaDefaultsAreDatabaseBacked(t *testing.T) {
 	require.NoError(t, UpdateSZUMonthlyQuotaDefaults(custom))
 	assert.Equal(t, custom, GetSZUMonthlyQuotaDefaults())
 	assert.Equal(t, custom.Student, SZUMonthlyQuotaForUser(&User{Role: common.RoleCommonUser, AccountType: AccountTypeStudent}))
+	assert.Equal(t, custom.Graduate, SZUMonthlyQuotaForUser(&User{Role: common.RoleCommonUser, AccountType: AccountTypeGraduate}))
 	assert.Equal(t, custom.Teacher, SZUMonthlyQuotaForUser(&User{Role: common.RoleCommonUser, AccountType: AccountTypeTeacher}))
 	assert.Equal(t, custom.Admin, SZUMonthlyQuotaForUser(&User{Role: common.RoleAdminUser}))
 
 	var stored []Option
 	require.NoError(t, DB.Where("key IN ?", keys).Find(&stored).Error)
-	assert.Len(t, stored, 3)
+	assert.Len(t, stored, 4)
 
 	common.OptionMapRWMutex.Lock()
 	for _, key := range keys {
@@ -328,14 +332,16 @@ func TestSZUMonthlyQuotaOptionQueryQuotesReservedKeyColumn(t *testing.T) {
 
 func TestSZUMonthlyQuotaDefaultsValidation(t *testing.T) {
 	assert.Error(t, ValidateSZUMonthlyQuotaDefaults(SZUMonthlyQuotaDefaults{
-		Student: 0,
-		Teacher: SZUTeacherMonthlyQuota,
-		Admin:   SZUAdminMonthlyQuota,
+		Student:  0,
+		Graduate: SZUGraduateMonthlyQuota,
+		Teacher:  SZUTeacherMonthlyQuota,
+		Admin:    SZUAdminMonthlyQuota,
 	}))
 	assert.Error(t, ValidateSZUMonthlyQuotaDefaults(SZUMonthlyQuotaDefaults{
-		Student: SZUStudentMonthlyQuota,
-		Teacher: common.MaxWalletQuota + 1,
-		Admin:   SZUAdminMonthlyQuota,
+		Student:  SZUStudentMonthlyQuota,
+		Graduate: SZUGraduateMonthlyQuota,
+		Teacher:  common.MaxWalletQuota + 1,
+		Admin:    SZUAdminMonthlyQuota,
 	}))
 }
 

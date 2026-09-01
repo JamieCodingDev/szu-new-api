@@ -20,6 +20,15 @@ For commercial licensing, please contact support@quantumnous.com
  * Layout constants and configurations
  */
 
+export function formatSiteBrandName(laboratoryName: string): string {
+  return `${laboratoryName} · New API`
+}
+
+export const PROFILE_MENU_DESTINATION = {
+  to: '/dashboard/$section',
+  params: { section: 'models' },
+} as const
+
 /**
  * Animation variants for mobile drawer
  */

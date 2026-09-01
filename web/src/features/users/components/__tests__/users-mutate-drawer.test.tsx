@@ -25,6 +25,7 @@ const { QueryClient, QueryClientProvider } =
   await import('@tanstack/react-query')
 const { api } = await import('@/lib/api')
 const { UsersProvider } = await import('../users-provider')
+const { resolveMonthlyQuota } = await import('../../lib/monthly-quota')
 const { UsersMutateDrawer } = await import('../users-mutate-drawer')
 
 const i18n = createInstance()
@@ -51,7 +52,12 @@ function renderCreateDrawer() {
       return {
         data: {
           success: true,
-          data: { student: 100000, teacher: 200000, admin: 1000000 },
+          data: {
+            student: 100000,
+            graduate: 100000,
+            teacher: 200000,
+            admin: 1000000,
+          },
         },
       }
     }
@@ -78,6 +84,26 @@ afterEach(() => {
 })
 
 describe('managed user identity form', () => {
+  test('uses the student quota as a compatibility fallback for graduate students', () => {
+    expect(
+      resolveMonthlyQuota(
+        { student: 100000, teacher: 200000, admin: 1000000 },
+        'graduate'
+      )
+    ).toBe(100000)
+    expect(
+      resolveMonthlyQuota(
+        {
+          student: 100000,
+          graduate: 150000,
+          teacher: 200000,
+          admin: 1000000,
+        },
+        'graduate'
+      )
+    ).toBe(150000)
+  })
+
   test('shows one identifier, one business role, and its global quota', async () => {
     renderCreateDrawer()
 

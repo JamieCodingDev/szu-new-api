@@ -67,7 +67,8 @@ describe('usage guide', () => {
     expect(screen.getAllByText('DeepSeek Harness').length).toBeGreaterThan(0)
 
     const content = container.textContent ?? ''
-    expect(content).toContain('http://172.31.233.175:3000/v1')
+    expect(content).toContain('https://llm.snrc.site/v1')
+    expect(content).not.toContain('172.31.233.175')
     expect(content).toContain('deepseek-v4-flash')
     expect(content).toContain('model_context_window = 131072')
     expect(content).toContain('model_auto_compact_token_limit = 114688')
@@ -79,6 +80,10 @@ describe('usage guide', () => {
     expect(content).toContain('Invoke-RestMethod')
     expect(content).toContain("item['content'] is not an array")
     expect(content).toContain('/v1/chat/completions')
+    expect(content).toContain('OpenAI Chat Completions (Requires Routing)')
+    expect(content).toContain('CC Switch > Settings > Routing')
+    expect(content).toContain('Routing master switch: ON')
+    expect(content).toContain('Claude route: ON')
     expect(content).toContain('http://127.0.0.1:15721')
     expect(content).toContain('npx @deepseek-ai/dsh web')
   })

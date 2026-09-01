@@ -44,7 +44,11 @@ export { SYSTEM_SETTINGS_VIEW } from './config/system-settings.config'
 export { defaultTopNavLinks } from './config/top-nav.config'
 
 // Constants
-export { MOBILE_DRAWER_ANIMATION, MOBILE_DRAWER_CONFIG } from './constants'
+export {
+  formatSiteBrandName,
+  MOBILE_DRAWER_ANIMATION,
+  MOBILE_DRAWER_CONFIG,
+} from './constants'
 
 // Sidebar view registry
 export {

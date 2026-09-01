@@ -28,6 +28,8 @@ import { useStatus } from '@/hooks/use-status'
 import { useSystemConfig } from '@/hooks/use-system-config'
 import { cn } from '@/lib/utils'
 
+import { formatSiteBrandName } from '../constants'
+
 type SystemBrandProps = {
   defaultName?: string
   defaultVersion?: string
@@ -51,7 +53,11 @@ export function SystemBrand(props: SystemBrandProps) {
   const { logo } = useSystemConfig()
 
   const variant = props.variant ?? 'sidebar'
-  const name = status?.system_name || props.defaultName || 'New API'
+  const name =
+    props.defaultName ||
+    formatSiteBrandName(
+      t('SNRC Intelligent Interconnection Network Laboratory')
+    )
   const version =
     status?.version || props.defaultVersion || t('Unknown version')
 

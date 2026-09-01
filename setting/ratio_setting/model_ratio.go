@@ -332,8 +332,8 @@ var defaultCompletionRatio = map[string]float64{
 	"gpt-4o-gizmo-*":           3,
 	"gpt-4-all":                2,
 	"gpt-image-1":              8,
-	"deepseek-v4-flash":        2,
-	"deepseek-v4-flash:latest": 2,
+	"deepseek-v4-flash":        10,
+	"deepseek-v4-flash:latest": 10,
 }
 
 // InitRatioSettings initializes all model related settings maps
@@ -388,6 +388,9 @@ func handleThinkingBudgetModel(name, prefix, wildcard string) string {
 
 func GetModelRatio(name string) (float64, bool, string) {
 	name = FormatMatchingModelName(name)
+	if isSZUDeepSeekPointBillingModel(name) {
+		return 1, true, name
+	}
 
 	ratio, ok := modelRatioMap.Get(name)
 	if !ok {
@@ -477,6 +480,9 @@ func GetCompletionRatioInfo(name string) CompletionRatioInfo {
 }
 
 func getHardcodedCompletionModelRatio(name string) (float64, bool) {
+	if isSZUDeepSeekPointBillingModel(name) {
+		return 10, true
+	}
 
 	isReservedModel := strings.HasSuffix(name, "-all") || strings.HasSuffix(name, "-gizmo-*")
 	if isReservedModel {
@@ -605,6 +611,11 @@ func getHardcodedCompletionModelRatio(name string) (float64, bool) {
 		return 0.79 / 0.59, true
 	}
 	return 1, false
+}
+
+func isSZUDeepSeekPointBillingModel(name string) bool {
+	name = FormatMatchingModelName(name)
+	return name == "deepseek-v4-flash" || name == "deepseek-v4-flash:latest"
 }
 
 func GetAudioRatio(name string) float64 {

@@ -35,7 +35,7 @@ import {
 import type { MonthlyQuotaDefaults } from '../types'
 
 const MAX_MONTHLY_QUOTA = Number.MAX_SAFE_INTEGER
-const EMPTY_FORM = { student: '', teacher: '', admin: '' }
+const EMPTY_FORM = { student: '', graduate: '', teacher: '', admin: '' }
 
 type MonthlyQuotaForm = Record<keyof MonthlyQuotaDefaults, string>
 
@@ -63,6 +63,7 @@ export function MonthlyQuotaDefaultsDialog({
     if (!open || !defaultsQuery.data) return
     setForm({
       student: String(defaultsQuery.data.student),
+      graduate: String(defaultsQuery.data.graduate),
       teacher: String(defaultsQuery.data.teacher),
       admin: String(defaultsQuery.data.admin),
     })
@@ -75,6 +76,7 @@ export function MonthlyQuotaDefaultsDialog({
   const handleSave = async () => {
     const values: MonthlyQuotaDefaults = {
       student: Number(form.student),
+      graduate: Number(form.graduate),
       teacher: Number(form.teacher),
       admin: Number(form.admin),
     }
@@ -114,6 +116,7 @@ export function MonthlyQuotaDefaultsDialog({
     label: string
   }> = [
     { role: 'student', label: t('Student Monthly Quota') },
+    { role: 'graduate', label: t('Graduate Student Monthly Quota') },
     { role: 'teacher', label: t('Teacher Monthly Quota') },
     { role: 'admin', label: t('Administrator Monthly Quota') },
   ]

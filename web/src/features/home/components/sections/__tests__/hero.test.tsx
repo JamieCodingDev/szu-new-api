@@ -26,12 +26,6 @@ vi.mock('@tanstack/react-router', () => ({
   ),
 }))
 
-vi.mock('@lobehub/icons', () => ({
-  CherryStudio: {
-    Color: () => <span aria-hidden='true' />,
-  },
-}))
-
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) =>
@@ -84,5 +78,18 @@ describe('home hero actions', () => {
       'href',
       '/sign-in'
     )
+  })
+
+  test('does not render the supported applications block', () => {
+    render(<Hero isAuthenticated />)
+
+    expect(screen.getByText('DeepSeek V4 Flash API')).toBeInTheDocument()
+    expect(screen.getByText('Dedicated Inference Service')).toBeInTheDocument()
+    expect(
+      screen.queryByText('Vast Range of AI Models')
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText('Supported Applications')).not.toBeInTheDocument()
+    expect(screen.queryByText('Cherry Studio')).not.toBeInTheDocument()
+    expect(screen.queryByText('CC Switch')).not.toBeInTheDocument()
   })
 })

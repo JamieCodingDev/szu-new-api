@@ -21,6 +21,7 @@ import { User, LogOut } from 'lucide-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { PROFILE_MENU_DESTINATION } from '@/components/layout/constants'
 import { SignOutDialog } from '@/components/sign-out-dialog'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -98,7 +99,7 @@ export function ProfileDropdown() {
 
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem onClick={() => navigate({ to: '/profile' })}>
+          <DropdownMenuItem onClick={() => navigate(PROFILE_MENU_DESTINATION)}>
             <User className='size-4' />
             {t('Profile')}
           </DropdownMenuItem>

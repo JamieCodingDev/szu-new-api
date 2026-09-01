@@ -83,8 +83,8 @@ type User struct {
 	OriginalPassword string                     `json:"original_password" gorm:"-:all"` // this field is only for Password change verification, don't save it to database!
 	DisplayName      string                     `json:"display_name" gorm:"index" validate:"max=50"`
 	Role             int                        `json:"role" gorm:"type:int;default:1"` // admin, common
-	AccountType      string                     `json:"account_type" gorm:"type:varchar(16);not null;default:'student';index" validate:"omitempty,oneof=student teacher"`
-	ManagedRole      string                     `json:"managed_role" gorm:"-:all" validate:"omitempty,oneof=admin teacher student"`
+	AccountType      string                     `json:"account_type" gorm:"type:varchar(16);not null;default:'student';index" validate:"omitempty,oneof=student graduate teacher"`
+	ManagedRole      string                     `json:"managed_role" gorm:"-:all" validate:"omitempty,oneof=admin teacher graduate student"`
 	Status           int                        `json:"status" gorm:"type:int;default:1"` // enabled, disabled
 	Email            string                     `json:"email" gorm:"index" validate:"max=50"`
 	GitHubId         string                     `json:"github_id" gorm:"column:github_id;index"`
@@ -465,6 +465,8 @@ func SearchUsers(keyword string, group string, managedRole string, status *int, 
 			query = query.Where("role >= ?", common.RoleAdminUser)
 		case ManagedRoleTeacher:
 			query = query.Where("role < ? AND account_type = ?", common.RoleAdminUser, AccountTypeTeacher)
+		case ManagedRoleGraduate:
+			query = query.Where("role < ? AND account_type = ?", common.RoleAdminUser, AccountTypeGraduate)
 		case ManagedRoleStudent:
 			query = query.Where("role < ? AND account_type = ?", common.RoleAdminUser, AccountTypeStudent)
 		}

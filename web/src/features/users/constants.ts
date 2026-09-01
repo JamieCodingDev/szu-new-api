@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Shield, User, Users } from 'lucide-react'
+import { GraduationCap, Shield, User, Users } from 'lucide-react'
 
 import type { User as UserType } from './types'
 
@@ -75,12 +75,22 @@ export const USER_ROLE = {
 export const MANAGED_ROLES = {
   admin: { labelKey: 'Admin', value: 'admin', icon: Shield },
   teacher: { labelKey: 'Teacher', value: 'teacher', icon: Users },
+  graduate: {
+    labelKey: 'Graduate Student',
+    value: 'graduate',
+    icon: GraduationCap,
+  },
   student: { labelKey: 'Student', value: 'student', icon: User },
 } as const
 
 export const getUserRoleOptions = (t: (key: string) => string) => [
   { label: t('Admin'), value: 'admin', icon: Shield },
   { label: t('Teacher'), value: 'teacher', icon: Users },
+  {
+    label: t('Graduate Student'),
+    value: 'graduate',
+    icon: GraduationCap,
+  },
   { label: t('Student'), value: 'student', icon: User },
 ]
 

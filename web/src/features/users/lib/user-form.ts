@@ -41,7 +41,7 @@ export const userFormSchema = z.object({
       'Please enter a valid email address'
     ),
   password: z.string().optional(),
-  managed_role: z.enum(['admin', 'teacher', 'student']),
+  managed_role: z.enum(['admin', 'teacher', 'graduate', 'student']),
   remark: z.string().optional(),
   admin_permissions: z
     .record(z.string(), z.record(z.string(), z.boolean()))

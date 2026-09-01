@@ -92,6 +92,7 @@ import {
   transformFormDataToPayload,
   transformUserToFormDefaults,
 } from '../lib'
+import { resolveMonthlyQuota } from '../lib/monthly-quota'
 import type { User } from '../types'
 import { useUsers } from './users-provider'
 
@@ -150,7 +151,10 @@ export function UsersMutateDrawer({
   const selectedRole = form.watch('managed_role')
   const canEditAdminPermissions = currentUser?.role === ROLE.SUPER_ADMIN
   const targetIsAdmin = selectedRole === 'admin'
-  const selectedMonthlyQuota = monthlyQuotaDefaults?.[selectedRole]
+  const selectedMonthlyQuota = resolveMonthlyQuota(
+    monthlyQuotaDefaults,
+    selectedRole
+  )
 
   const onSubmit = async (data: UserFormValues) => {
     if (!isUpdate) {

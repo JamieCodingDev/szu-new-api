@@ -8,7 +8,7 @@ import (
 )
 
 // GetSZUMonthlyQuotaDefaults returns the global monthly grant policy used for
-// students, teachers, and administrators.
+// students, graduate students, teachers, and administrators.
 func GetSZUMonthlyQuotaDefaults(c *gin.Context) {
 	common.ApiSuccess(c, model.GetSZUMonthlyQuotaDefaults())
 }
@@ -28,9 +28,10 @@ func UpdateSZUMonthlyQuotaDefaults(c *gin.Context) {
 	}
 
 	recordManageAuditFor(c, 0, "monthly_quota_defaults.update", map[string]interface{}{
-		"student": defaults.Student,
-		"teacher": defaults.Teacher,
-		"admin":   defaults.Admin,
+		"student":  defaults.Student,
+		"graduate": defaults.Graduate,
+		"teacher":  defaults.Teacher,
+		"admin":    defaults.Admin,
 	})
 	common.ApiSuccess(c, model.GetSZUMonthlyQuotaDefaults())
 }
